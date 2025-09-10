@@ -21,22 +21,37 @@ import {
   Divider,
   Input,
   useToast,
+  Textarea,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  FormControl,
+  FormLabel,
 } from '@chakra-ui/react'
-import { Plus, MessageSquare, List, Tag, Map } from 'lucide-react'
-import { useReactFlow, useNodes } from 'reactflow'
+import { Plus, MessageSquare, List, Tag, Map, ArrowLeft, Search, ChevronDown, ChevronRight, Edit } from 'lucide-react'
+import { useReactFlow } from 'reactflow'
 import { v4 as uuidv4 } from 'uuid'
-import { CustomNode } from '../types'
+import { CustomNode, Tag as TagType } from '../types'
 
 interface SidebarProps {
-  tags: {name: string, color: string}[]
-  onTagsChange: (tags: {name: string, color: string}[]) => void
+  tags: TagType[]
+  onTagsChange: (tags: TagType[]) => void
   showMiniMap?: boolean
   onMiniMapToggle?: () => void
+  onBackToProjectList?: () => void
+  onNodeSelect?: (node: CustomNode) => void
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = true, onMiniMapToggle }) => {
+const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = true, onMiniMapToggle, onBackToProjectList, onNodeSelect }) => {
   const [isNodeListOpen, setIsNodeListOpen] = useState(false)
   const [isTagListOpen, setIsTagListOpen] = useState(false)
+  const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set())
+  const [allTagsExpanded, setAllTagsExpanded] = useState(false)
+  const [editingTag, setEditingTag] = useState<TagType | null>(null)
   
   // 互斥展开逻辑 - 直接切换
   const handleNodeListToggle = () => {
@@ -48,9 +63,11 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
     if (isNodeListOpen) setIsNodeListOpen(false)
     setIsTagListOpen(!isTagListOpen)
   }
-  const [hoveredButton, setHoveredButton] = useState<string | null>(null)
+  // const [hoveredButton, setHoveredButton] = useState<string | null>(null)
   const [newTag, setNewTag] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const { isOpen: isAddNodeOpen, onOpen: onAddNodeOpen, onClose: onAddNodeClose } = useDisclosure()
+  const { isOpen: isEditTagOpen, onOpen: onEditTagOpen, onClose: onEditTagClose } = useDisclosure()
   const reactFlowInstance = useReactFlow()
   const toast = useToast()
   
@@ -105,9 +122,14 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
   }
 
   const handleNodeClick = (nodeId: string) => {
-    const node = reactFlowInstance.getNode(nodeId)
+    const node = reactFlowInstance.getNode(nodeId) as CustomNode
     if (node) {
+      // 定位到节点
       reactFlowInstance.setCenter(node.position.x + 100, node.position.y + 50, { zoom: 1.2 })
+      // 触发节点选择，显示节点设置面板
+      if (onNodeSelect) {
+        onNodeSelect(node)
+      }
     }
   }
 
@@ -115,7 +137,13 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
     if (newTag.trim() && !tags.some(tag => tag.name === newTag.trim())) {
       const colors = ['red', 'blue', 'green', 'orange', 'purple', 'teal', 'pink', 'cyan']
       const randomColor = colors[Math.floor(Math.random() * colors.length)]
-      onTagsChange([...tags, {name: newTag.trim(), color: randomColor}])
+      const newTagObj: TagType = {
+        id: uuidv4(),
+        name: newTag.trim(),
+        color: randomColor,
+        description: ''
+      }
+      onTagsChange([...tags, newTagObj])
       setNewTag('')
       toast({
         title: '标签已添加',
@@ -126,8 +154,8 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
     }
   }
 
-  const removeTag = (tagToRemove: string) => {
-    onTagsChange(tags.filter(tag => tag.name !== tagToRemove))
+  const removeTag = (tagId: string) => {
+    onTagsChange(tags.filter(tag => tag.id !== tagId))
     toast({
       title: '标签已删除',
       status: 'info',
@@ -136,7 +164,47 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
     })
   }
 
+  // const toggleTagExpansion = (tagId: string) => {
+  //   const newExpanded = new Set(expandedTags)
+  //   if (newExpanded.has(tagId)) {
+  //     newExpanded.delete(tagId)
+  //   } else {
+  //     newExpanded.add(tagId)
+  //   }
+  //   setExpandedTags(newExpanded)
+  // }
+
+  const toggleAllTags = () => {
+    if (allTagsExpanded) {
+      setExpandedTags(new Set())
+    } else {
+      setExpandedTags(new Set(tags.map(tag => tag.id)))
+    }
+    setAllTagsExpanded(!allTagsExpanded)
+  }
+
+  const handleEditTag = (tag: TagType) => {
+    setEditingTag({...tag}) // 使用深拷贝避免直接修改原对象
+    onEditTagOpen()
+  }
+
+  const saveTagEdit = (updatedTag: TagType) => {
+    onTagsChange(tags.map(tag => tag.id === updatedTag.id ? updatedTag : tag))
+    setEditingTag(null)
+    onEditTagClose()
+    toast({
+      title: '标签已更新',
+      status: 'success',
+      duration: 2000,
+      isClosable: true,
+    })
+  }
+
   const allNodes = reactFlowInstance.getNodes() as CustomNode[]
+  const filteredNodes = allNodes.filter(node => 
+    node.data.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    node.data.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   return (
     <Flex h="100%" position="relative">
@@ -150,11 +218,26 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
           borderColor={borderColor}
           p={3}
         >
-          <Text fontSize="md" fontWeight="bold" mb={3}>
-            节点列表 ({allNodes.length})
-          </Text>
-          <VStack spacing={2} align="stretch" maxH="calc(100vh - 80px)" overflowY="auto">
-            {allNodes.map((node) => (
+          <VStack spacing={3} align="stretch">
+            <Text fontSize="md" fontWeight="bold">
+              节点列表 ({filteredNodes.length})
+            </Text>
+            
+            {/* 搜索输入框 */}
+            <HStack spacing={2}>
+              <Search size={16} color="gray.500" />
+              <Input
+                size="sm"
+                placeholder="搜索节点名称..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                variant="filled"
+              />
+            </HStack>
+          </VStack>
+          
+          <VStack spacing={2} align="stretch" maxH="calc(100vh - 140px)" overflowY="auto" mt={3}>
+            {filteredNodes.map((node) => (
               <Card
                 key={node.id}
                 size="sm"
@@ -178,9 +261,9 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
                 </CardBody>
               </Card>
             ))}
-            {allNodes.length === 0 && (
+            {filteredNodes.length === 0 && (
               <Text fontSize="sm" color="gray.500" textAlign="center" py={8}>
-                暂无节点
+                {searchQuery ? '未找到匹配的节点' : '暂无节点'}
               </Text>
             )}
           </VStack>
@@ -197,9 +280,18 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
           borderColor={borderColor}
           p={3}
         >
-          <Text fontSize="md" fontWeight="bold" mb={3}>
-            标签列表 ({tags.length})
-          </Text>
+          <HStack justify="space-between" mb={3}>
+            <Text fontSize="md" fontWeight="bold">
+              标签列表 ({tags.length})
+            </Text>
+            <IconButton
+              aria-label={allTagsExpanded ? "收缩全部" : "展开全部"}
+              icon={allTagsExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              size="sm"
+              variant="ghost"
+              onClick={toggleAllTags}
+            />
+          </HStack>
           
           {/* 添加新标签 */}
           <HStack mb={3}>
@@ -217,20 +309,40 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
           
           {/* 标签列表 */}
           <VStack spacing={2} align="stretch" maxH="calc(100vh - 200px)" overflowY="auto">
-            {tags.map((tag, index) => (
-              <HStack key={index} justify="space-between" p={2} bg={hoverBg} borderRadius="md">
-                <Badge colorScheme={tag.color} variant="subtle">
-                  {tag.name}
-                </Badge>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  colorScheme="red"
-                  onClick={() => removeTag(tag.name)}
-                >
-                  删除
-                </Button>
-              </HStack>
+            {tags.map((tag) => (
+              <Box key={tag.id}>
+                <HStack justify="space-between" p={2} bg={hoverBg} borderRadius="md">
+                  <Badge colorScheme={tag.color} variant="subtle">
+                    {tag.name}
+                  </Badge>
+                  <HStack spacing={1}>
+                    <IconButton
+                      aria-label="编辑标签"
+                      icon={<Edit size={12} />}
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => handleEditTag(tag)}
+                    />
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      colorScheme="red"
+                      onClick={() => removeTag(tag.id)}
+                    >
+                      删除
+                    </Button>
+                  </HStack>
+                </HStack>
+                
+                {/* 展开的描述区域 */}
+                <Collapse in={expandedTags.has(tag.id)}>
+                  <Box pl={6} pr={2} pb={2}>
+                    <Text fontSize="xs" color="gray.600">
+                      {tag.description || '暂无描述'}
+                    </Text>
+                  </Box>
+                </Collapse>
+              </Box>
             ))}
           </VStack>
           
@@ -257,12 +369,23 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
         >
           <CardBody p={2}>
             <VStack spacing={2}>
-              {/* Logo 区域 */}
-              <Text fontSize="xs" fontWeight="bold" color={iconColor} py={1}>
-                PRD
-              </Text>
-              
-              <Divider />
+              {/* 返回按钮 */}
+              {onBackToProjectList && (
+                <>
+                  <Tooltip label="返回项目列表" placement="right">
+                    <IconButton
+                      aria-label="返回项目列表"
+                      icon={<ArrowLeft size={16} />}
+                      size="sm"
+                      variant="ghost"
+                      color={iconColor}
+                      _hover={{ bg: hoverBg, color: 'blue.500' }}
+                      onClick={onBackToProjectList}
+                    />
+                  </Tooltip>
+                  <Divider />
+                </>
+              )}
               
               {/* 添加节点功能 */}
               <Popover isOpen={isAddNodeOpen} onClose={onAddNodeClose}>
@@ -369,6 +492,73 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
         </Card>
       </Box>
       
+      {/* 添加节点弹窗 */}
+      <Modal isOpen={isAddNodeOpen} onClose={onAddNodeClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>添加新节点</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={3}>
+              <Button
+                w="full"
+                leftIcon={<MessageSquare size={16} />}
+                onClick={() => addNode('page')}
+                colorScheme="blue"
+              >
+                添加页面
+              </Button>
+              <Button
+                w="full"
+                leftIcon={<MessageSquare size={16} />}
+                onClick={() => addNode('modal')}
+                colorScheme="purple"
+              >
+                添加弹窗
+              </Button>
+            </VStack>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      {/* 标签编辑弹窗 */}
+      <Modal isOpen={isEditTagOpen} onClose={onEditTagClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>编辑标签</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {editingTag && (
+              <VStack spacing={4}>
+                <FormControl>
+                  <FormLabel>标签名称</FormLabel>
+                  <Input
+                    value={editingTag.name}
+                    onChange={(e) => setEditingTag({...editingTag, name: e.target.value})}
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>名词解释</FormLabel>
+                  <Textarea
+                    value={editingTag.description}
+                    onChange={(e) => setEditingTag({...editingTag, description: e.target.value})}
+                    placeholder="输入标签的名词解释..."
+                    rows={4}
+                  />
+                </FormControl>
+              </VStack>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onEditTagClose}>
+              取消
+            </Button>
+            <Button colorScheme="blue" onClick={() => editingTag && saveTagEdit(editingTag)}>
+              保存
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
 
     </Flex>
   )

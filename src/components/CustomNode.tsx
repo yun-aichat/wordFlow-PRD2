@@ -2,13 +2,14 @@ import React, { useState, useCallback } from 'react'
 import {
   Box,
   Text,
-  Badge,
+  // Badge,
   useColorModeValue,
   VStack,
   HStack,
   Input,
   Textarea,
   IconButton,
+  Image,
 } from '@chakra-ui/react'
 import { Plus, X } from 'lucide-react'
 import { Handle, Position, NodeProps } from 'reactflow'
@@ -28,6 +29,9 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
   const [editContent, setEditContent] = useState(data.content || '')
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [editingItemName, setEditingItemName] = useState('')
+
+  // 检查是否有任何编辑状态激活
+  const hasActiveEditing = isEditing || editingItemId !== null
 
   const handleDoubleClick = useCallback(() => {
     if (data.type === 'comment') {
@@ -76,7 +80,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
       setEditingItemName('')
     }
   }, [handleItemSave])
-  const bgColor = useColorModeValue('white', 'gray.700')
+  // const bgColor = useColorModeValue('white', 'gray.700')
   const borderColor = useColorModeValue('gray.200', 'gray.600')
   const selectedBorderColor = useColorModeValue('blue.400', 'blue.300')
   const textColor = useColorModeValue('gray.800', 'white')
@@ -97,6 +101,10 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
   const modalIconColor = useColorModeValue('purple.600', 'purple.200')
   const commentIconColor = useColorModeValue('orange.600', 'orange.200')
   const defaultIconColor = useColorModeValue('gray.600', 'gray.300')
+
+  // 列表项悬浮颜色
+  const itemHoverBgColor = useColorModeValue('gray.50', 'gray.600')
+  const textHoverBgColor = useColorModeValue('gray.100', 'gray.500')
 
   const getNodeColor = () => {
     switch (data.type) {
@@ -134,14 +142,14 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
     }
   }
 
-  const getBadgeColor = (type: string) => {
-    switch (type) {
-      case 'page': return 'blue'
-      case 'modal': return 'purple'
-      case 'comment': return 'orange'
-      default: return 'gray'
-    }
-  }
+  // const getBadgeColor = (type: string) => {
+  //   switch (type) {
+  //     case 'page': return 'blue'
+  //     case 'modal': return 'purple'
+  //     case 'comment': return 'orange'
+  //     default: return 'gray'
+  //   }
+  // }
 
   // 备注节点的简约样式
   if (data.type === 'comment') {
@@ -162,6 +170,9 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
         }}
         onDoubleClick={handleDoubleClick}
         cursor={isEditing ? 'default' : 'pointer'}
+        opacity={data.disabled ? 0.5 : 1}
+        filter={data.disabled ? 'grayscale(50%)' : 'none'}
+        className={hasActiveEditing ? 'nodrag' : ''}
       >
         <VStack spacing={2} align="start">
           <HStack spacing={2}>
@@ -175,6 +186,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
                  placeholder="输入内容，键入 { 来引用标签"
                  onBlur={handleSave}
                  onKeyDown={handleKeyDown}
+                 // className="nodrag"
                />
             ) : (
               <TaggedText 
@@ -194,6 +206,8 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
               onChange={(e) => setEditContent(e.target.value)}
               onBlur={handleSave}
               onKeyDown={handleKeyDown}
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseMove={(e) => e.stopPropagation()}
               fontSize="xs"
               color={subtextColor}
               size="sm"
@@ -201,6 +215,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
               placeholder="备注内容"
               resize="none"
               rows={3}
+              className="nodrag"
             />
           ) : (
             <TaggedText 
@@ -235,6 +250,9 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
       }}
       position="relative"
       role="group"
+      opacity={data.disabled ? 0.5 : 1}
+      filter={data.disabled ? 'grayscale(50%)' : 'none'}
+      className={hasActiveEditing ? 'nodrag' : ''}
     >
       {/* 标题区域的左侧接入柄 */}
       <Handle
@@ -242,32 +260,53 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
         position={Position.Left}
         style={{
           background: '#555',
-          width: 8,
-          height: 8,
+          width: 12,
+          height: 12,
           top: '20px',
-          left: '-4px'
+          left: '-6px'
         }}
       />
       
       {/* 标题和基本信息区域 */}
       <Box p={4} pb={2}>
         <VStack spacing={2} align="start">
-          <Box display="flex" alignItems="center" gap={2} w="100%">
-            <Text fontSize="lg" color={getIconColor()}>{getNodeIcon(data.type)}</Text>
-            <Badge colorScheme={getBadgeColor(data.type)} size="sm">
-              {data.type === 'page' ? '页面' : data.type === 'modal' ? '弹窗' : '注释'}
-            </Badge>
-          </Box>
+          {/* 图片显示 */}
+          {data.image && (
+            <Box w="100%" mb={2}>
+              <Image
+                src={data.image}
+                alt={data.name || '节点图片'}
+                borderRadius="md"
+                w="100%"
+                h="auto"
+                maxH="120px"
+                objectFit="contain"
+                cursor="pointer"
+                _hover={{ opacity: 0.8 }}
+                transition="opacity 0.2s"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  // 触发图片展开事件
+                  const event = new CustomEvent('openImageModal', { detail: { image: data.image } })
+                  window.dispatchEvent(event)
+                }}
+              />
+            </Box>
+          )}
           
-          <TaggedText
-             text={data.name || '未命名节点'}
-             fontSize="md"
-             fontWeight="bold"
-             color={textColor}
-             noOfLines={2}
-             w="100%"
-             tags={tags}
-           />
+          {/* Icon + 名称 */}
+          <HStack spacing={2} w="100%">
+            <Text fontSize="lg" color={getIconColor()}>{getNodeIcon(data.type)}</Text>
+            <TaggedText
+               text={data.name || '未命名节点'}
+               fontSize="md"
+               fontWeight="bold"
+               color={textColor}
+               noOfLines={2}
+               flex={1}
+               tags={tags}
+             />
+          </HStack>
           
           {data.description && (
             <TaggedText
@@ -285,7 +324,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
       {/* 自定义列表项区域 */}
         <Box borderTop="1px" borderColor={borderColor}>
           {data.customItems && data.customItems.length > 0 && (
-            data.customItems.map((item, index) => (
+            data.customItems.map((item, _index) => (
                <Box
                  key={item.id}
                  position="relative"
@@ -293,7 +332,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
                  py={1.5}
                  borderBottom="1px"
                  borderColor={borderColor}
-                 _hover={{ bg: useColorModeValue('gray.50', 'gray.600') }}
+                 _hover={{ bg: itemHoverBgColor }}
                  role="group"
                >
                  <HStack spacing={2} w="100%">
@@ -303,10 +342,13 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
                        onChange={(e) => setEditingItemName(e.target.value)}
                        onKeyDown={handleItemKeyDown}
                        onBlur={handleItemSave}
+                       onMouseDown={(e) => e.stopPropagation()}
+                       onMouseMove={(e) => e.stopPropagation()}
                        fontSize="sm"
                        size="sm"
                        autoFocus
                        flex={1}
+                       className="nodrag"
                      />
                    ) : (
                      <Text 
@@ -315,7 +357,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
                        flex={1}
                        onDoubleClick={() => handleItemDoubleClick(item)}
                        cursor="pointer"
-                       _hover={{ bg: useColorModeValue('gray.100', 'gray.500') }}
+                       _hover={{ bg: textHoverBgColor }}
                        p={1}
                        borderRadius="sm"
                      >
@@ -347,9 +389,9 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
                   id={`${data.id}-${item.id}`}
                   style={{
                     background: '#555',
-                    width: 6,
-                    height: 6,
-                    right: '-3px',
+                    width: 12,
+                    height: 12,
+                    right: '-6px',
                     top: '50%',
                     transform: 'translateY(-50%)'
                   }}

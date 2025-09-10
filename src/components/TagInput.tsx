@@ -149,26 +149,26 @@ const TagInput: React.FC<TagInputProps> = ({
   }, [isOpen, onClose, onKeyDown, filteredTags, selectedIndex, handleSelectTag])
 
   // 渲染带有高亮标签的内容
-  const renderValueWithTags = (text: string) => {
-    const parts = text.split(/({[^}]*})/g)
-    return parts.map((part, index) => {
-      if (part.match(/^{.*}$/)) {
-        const tagName = part.slice(1, -1)
-        return (
-          <Badge 
-            key={index} 
-            colorScheme="purple" 
-            variant="subtle" 
-            mx={1}
-            fontSize="xs"
-          >
-            {tagName}
-          </Badge>
-        )
-      }
-      return part
-    })
-  }
+  // const renderValueWithTags = (text: string) => {
+  //   const parts = text.split(/({[^}]*})/g)
+  //   return parts.map((part, index) => {
+  //     if (part.match(/^{.*}$/)) {
+  //       const tagName = part.slice(1, -1)
+  //       return (
+  //         <Badge 
+  //           key={index} 
+  //           colorScheme="purple" 
+  //           variant="subtle" 
+  //           mx={1}
+  //           fontSize="xs"
+  //         >
+  //           {tagName}
+  //         </Badge>
+  //       )
+  //     }
+  //     return part
+  //   })
+  // }
 
   return (
     <Box position="relative">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   Box,
   VStack,
@@ -6,7 +6,7 @@ import {
   FormLabel,
   Input,
   Textarea,
-  Select,
+  // Select,
   Button,
   HStack,
   Text,
@@ -16,27 +16,38 @@ import {
   Tab,
   TabPanel,
   useColorModeValue,
-  Alert,
-  AlertIcon,
+  // Alert,
+  // AlertIcon,
   Card,
   CardHeader,
   CardBody,
   IconButton,
-  Collapse,
   useToast,
+  Image,
+  AspectRatio,
+  // Flex,
+  // Spacer,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalBody,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
 } from '@chakra-ui/react'
-import { CloseIcon, ChevronUpIcon, ChevronDownIcon } from '@chakra-ui/icons'
-import { Eye } from 'lucide-react'
+import { CloseIcon, CopyIcon, ViewIcon, ViewOffIcon } from '@chakra-ui/icons'
+import { Upload, X, Maximize2 } from 'lucide-react'
 import { useReactFlow } from 'reactflow'
-import ReactMarkdown from 'react-markdown'
 import { CustomNode, NodeFormData } from '../types'
-import TagInput from './TagInput'
+// import TagInput from './TagInput'
+import MarkdownEditor from './MarkdownEditor'
 
 interface NodeSettingsPanelProps {
   selectedNode: CustomNode | null
   onNodeUpdate: (node: CustomNode | null) => void
   onClose: () => void
-  tags: {name: string, color: string}[]
+  tags: {id: string, name: string, color: string}[]
 }
 
 const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
@@ -50,8 +61,13 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
     content: '',
     description: '',
   })
-  const [isCollapsed, setIsCollapsed] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
+  // const [showPreview, setShowPreview] = useState(false)
+  const [isExpanded] = useState(false)
+  const [isFullscreenModalOpen, setIsFullscreenModalOpen] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const autoSaveTimeoutRef = useRef<number | null>(null)
   const reactFlowInstance = useReactFlow()
   const toast = useToast()
   const bgColor = useColorModeValue('white', 'gray.800')
@@ -65,14 +81,130 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
         content: selectedNode.data.content,
         description: selectedNode.data.description || '',
       })
+      setSelectedImage(selectedNode.data.image || null)
     }
   }, [selectedNode])
+
+  // 监听来自CustomNode的图片展开事件
+  useEffect(() => {
+    const handleOpenImageModal = (event: CustomEvent) => {
+      const { image } = event.detail
+      setSelectedImage(image)
+      setIsImageModalOpen(true)
+    }
+
+    window.addEventListener('openImageModal', handleOpenImageModal as EventListener)
+    return () => {
+      window.removeEventListener('openImageModal', handleOpenImageModal as EventListener)
+    }
+  }, [])
+
+  // 添加粘贴事件监听器
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item.type.indexOf('image') !== -1) {
+            const file = item.getAsFile();
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                const result = event.target?.result as string;
+                setSelectedImage(result);
+              };
+              reader.readAsDataURL(file);
+            }
+            break;
+          }
+        }
+      }
+    };
+
+    document.addEventListener('paste', handlePaste);
+    return () => {
+      document.removeEventListener('paste', handlePaste);
+    };
+  }, [])
+
+  // 自动保存功能
+  useEffect(() => {
+    if (!selectedNode) return
+
+    // 清除之前的定时器
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current)
+    }
+
+    // 设置新的定时器，1秒后自动保存
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      const updatedNode: CustomNode = {
+        ...selectedNode,
+        data: {
+          ...selectedNode.data,
+          name: formData.name,
+          content: formData.content,
+          description: formData.description,
+          image: selectedImage || undefined,
+        },
+      }
+
+      // 更新 React Flow 中的节点
+      reactFlowInstance.setNodes((nodes) =>
+        nodes.map((node) =>
+          node.id === selectedNode.id ? updatedNode : node
+        )
+      )
+
+      onNodeUpdate(updatedNode)
+    }, 1000)
+
+    // 清理函数
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current)
+      }
+    }
+  }, [formData, selectedImage, selectedNode, reactFlowInstance, onNodeUpdate])
 
   const handleInputChange = (field: keyof NodeFormData, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: value,
     }))
+  }
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const result = e.target?.result as string
+        setSelectedImage(result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleToggleDisabled = () => {
+    if (!selectedNode) return
+
+    const updatedNode: CustomNode = {
+      ...selectedNode,
+      data: {
+        ...selectedNode.data,
+        disabled: !selectedNode.data.disabled,
+      },
+    }
+
+    reactFlowInstance.setNodes((nodes) =>
+      nodes.map((node) =>
+        node.id === selectedNode.id ? updatedNode : node
+      )
+    )
+
+    onNodeUpdate(updatedNode)
   }
 
   const handleSave = () => {
@@ -85,6 +217,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
         name: formData.name,
         content: formData.content,
         description: formData.description,
+        image: selectedImage || undefined,
       },
     }
 
@@ -151,20 +284,22 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
   }
 
   return (
-    <Card
-      position="fixed"
-      top={4}
-      right={4}
-      bottom={4}
-      width="400px"
-      maxHeight="calc(100vh - 32px)"
-      bg={bgColor}
-      border="1"
-      borderColor={borderColor}
-      shadow="lg"
-      zIndex={1000}
-      overflowY="auto"
-    >
+    <>
+      <Card
+        position="fixed"
+        top={4}
+        right={4}
+        bottom={4}
+        width="400px"
+        maxHeight="calc(100vh - 32px)"
+        bg={bgColor}
+        border="1"
+        borderColor={borderColor}
+        shadow="lg"
+        zIndex={1000}
+        display="flex"
+        flexDirection="column"
+      >
       <CardHeader pb={2}>
         <HStack justify="space-between" align="center">
           <Text fontSize="lg" fontWeight="bold">
@@ -172,11 +307,12 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
           </Text>
           <HStack spacing={1}>
             <IconButton
-              aria-label="折叠/展开"
-              icon={isCollapsed ? <ChevronDownIcon /> : <ChevronUpIcon />}
+              aria-label={selectedNode?.data.disabled ? "启用节点" : "禁用节点"}
+              icon={selectedNode?.data.disabled ? <ViewOffIcon /> : <ViewIcon />}
               size="sm"
               variant="ghost"
-              onClick={() => setIsCollapsed(!isCollapsed)}
+              color={selectedNode?.data.disabled ? "gray.400" : "gray.600"}
+              onClick={handleToggleDisabled}
             />
             <IconButton
               aria-label="关闭"
@@ -187,63 +323,126 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
             />
           </HStack>
         </HStack>
-      </CardHeader>
+        </CardHeader>
 
-      <Collapse in={!isCollapsed}>
-        <CardBody pt={0}>
+      <CardBody pt={0} flex={1} overflowY="auto" pb={0}>
           <Tabs size="sm" variant="enclosed">
             <TabList>
               <Tab>基本信息</Tab>
-              <Tab>内容编辑</Tab>
+              <Tab>内容详情</Tab>
             </TabList>
 
             <TabPanels>
               <TabPanel px={0} py={3}>
-                <VStack spacing={3} align="stretch">
-                  {/* 类型 */}
-                  <FormControl size="sm">
-                    <FormLabel fontSize="sm">类型</FormLabel>
-                    <Select
-                      size="sm"
-                      value={selectedNode.data.type}
-                      onChange={(e) => handleTypeChange(e.target.value as 'page' | 'modal')}
-                    >
-                      <option value="page">📄 页面</option>
-                      <option value="modal">🪟 弹窗</option>
-                    </Select>
-                  </FormControl>
-
+                <VStack spacing={3} align="stretch" h="100%">
                   {/* 名称 */}
                   <FormControl size="sm">
                     <FormLabel fontSize="sm">名称</FormLabel>
-                    <Input
-                      size="sm"
-                      value={formData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
-                      placeholder="输入节点名称"
-                    />
+                    <HStack spacing={0}>
+                      <Menu>
+                        <MenuButton
+                          as={IconButton}
+                          aria-label="选择类型"
+                          icon={<Text fontSize="lg">{selectedNode.data.type === 'page' ? '💻' : '📰'}</Text>}
+                          size="sm"
+                          variant="ghost"
+                          borderRadius="md 0 0 md"
+                          borderRight="1px"
+                          borderColor="gray.200"
+                          _hover={{ bg: "gray.50" }}
+                        />
+                        <MenuList>
+                          <MenuItem onClick={() => handleTypeChange('page')}>
+                            <HStack spacing={2}>
+                              <Text>💻</Text>
+                              <Text>页面</Text>
+                            </HStack>
+                          </MenuItem>
+                          <MenuItem onClick={() => handleTypeChange('modal')}>
+                            <HStack spacing={2}>
+                              <Text>📰</Text>
+                              <Text>弹窗</Text>
+                            </HStack>
+                          </MenuItem>
+                        </MenuList>
+                      </Menu>
+                      <Input
+                        size="sm"
+                        value={formData.name}
+                        onChange={(e) => handleInputChange('name', e.target.value)}
+                        placeholder="输入节点名称"
+                        borderRadius="0 md md 0"
+                        borderLeft="none"
+                        flex={1}
+                      />
+                    </HStack>
+                  </FormControl>
+
+                  {/* 图片上传 */}
+                  <FormControl size="sm">
+                    <FormLabel fontSize="sm">图片</FormLabel>
+                    <VStack spacing={2} align="stretch">
+                      {selectedImage && (
+                        <Box position="relative" maxW="200px" role="group">
+                          <AspectRatio ratio={16/9}>
+                            <Image
+                              src={selectedImage}
+                              alt="节点图片"
+                              borderRadius="md"
+                              objectFit="cover"
+                              cursor="pointer"
+                              onClick={() => setIsImageModalOpen(true)}
+                            />
+                          </AspectRatio>
+                          <IconButton
+                             aria-label="删除图片"
+                             icon={<X size={12} />}
+                             size="xs"
+                             position="absolute"
+                             top={1}
+                             right={1}
+                             bg="rgba(0, 0, 0, 0.5)"
+                             color="white"
+                             variant="solid"
+                             borderRadius="full"
+                             opacity={0}
+                             _groupHover={{ opacity: 1 }}
+                             _hover={{ bg: "rgba(0, 0, 0, 0.7)" }}
+                             transition="opacity 0.2s"
+                             onClick={() => setSelectedImage(null)}
+                           />
+                        </Box>
+                      )}
+                      <Button
+                        size="sm"
+                        leftIcon={<Upload size={14} />}
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        {selectedImage ? '更换图片' : '上传或粘贴图片'}
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={handleImageUpload}
+                      />
+                    </VStack>
                   </FormControl>
 
                   {/* 描述 */}
-                  <FormControl size="sm">
+                  <FormControl size="sm" flex={1}>
                     <FormLabel fontSize="sm">描述</FormLabel>
                     <Textarea
                       size="sm"
                       value={formData.description}
                       onChange={(e) => handleInputChange('description', e.target.value)}
                       placeholder="输入节点描述（可选）"
-                      rows={2}
+                      rows={3}
+                      resize="vertical"
                     />
                   </FormControl>
-
-                  <HStack spacing={2}>
-                    <Button size="sm" colorScheme="blue" flex={1} onClick={handleSave}>
-                      保存
-                    </Button>
-                    <Button size="sm" colorScheme="red" variant="outline" flex={1} onClick={handleDelete}>
-                      删除
-                    </Button>
-                  </HStack>
                 </VStack>
               </TabPanel>
 
@@ -252,52 +451,126 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                   <FormControl size="sm">
                     <HStack justify="space-between" align="center" mb={2}>
                       <FormLabel fontSize="sm" mb={0}>PRD内容</FormLabel>
-                      {formData.content && (
+                      <HStack spacing={1}>
                         <IconButton
-                          aria-label="预览"
-                          icon={<Eye size={14} />}
+                          aria-label="全屏预览"
+                          icon={<Maximize2 size={14} />}
                           size="xs"
                           variant="ghost"
-                          onClick={() => setShowPreview(!showPreview)}
+                          onClick={() => setIsFullscreenModalOpen(true)}
                         />
-                      )}
+                      </HStack>
                     </HStack>
-                    <TagInput
-                      value={formData.content}
-                      onChange={(value) => handleInputChange('content', value)}
-                      placeholder="支持 Markdown 格式和标签引用 {标签名}\n\n# 标题\n**粗体文本**\n- 列表项"
-                      tags={tags}
-                      minH="300px"
-                      fontFamily="mono"
-                      fontSize="xs"
-                      multiline={true}
-                    />
-                  </FormControl>
-
-                  {formData.content && showPreview && (
-                    <Box>
-                      <Text fontSize="xs" color="gray.500" mb={2}>预览:</Text>
-                      <Box
-                        border="1px"
-                        borderColor={borderColor}
-                        borderRadius="md"
-                        p={2}
-                        maxH="200px"
-                        overflowY="auto"
-                        bg={useColorModeValue('gray.50', 'gray.700')}
-                        fontSize="xs"
-                      >
-                        <ReactMarkdown>{formData.content}</ReactMarkdown>
-                      </Box>
+                    
+                    <Box height={isExpanded ? "500px" : "300px"}>
+                      <MarkdownEditor
+                        value={formData.content}
+                        onChange={(value) => handleInputChange('content', value)}
+                        placeholder="支持 Markdown 格式和标签引用 {标签名}。输入 { 可触发标签自动补全"
+                        tags={tags}
+                      />
                     </Box>
-                  )}
+                  </FormControl>
                 </VStack>
               </TabPanel>
             </TabPanels>
           </Tabs>
         </CardBody>
-      </Collapse>
-    </Card>
+        
+        {/* 底部按键区域 */}
+        <Box p={4} borderTop="1px" borderColor={borderColor}>
+          <HStack spacing={2}>
+            <Button size="sm" colorScheme="blue" flex={1} onClick={handleSave}>
+              保存
+            </Button>
+            <Button size="sm" colorScheme="red" variant="outline" flex={1} onClick={handleDelete}>
+              删除
+            </Button>
+          </HStack>
+        </Box>
+      </Card>
+      
+      {/* 图片展开查看Modal */}
+      <Modal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} size="full">
+        <ModalOverlay bg="rgba(0, 0, 0, 0.8)" />
+        <ModalContent bg="transparent" boxShadow="none">
+          <ModalBody p={0} display="flex" alignItems="center" justifyContent="center" position="relative">
+            <Image
+              src={selectedImage || ''}
+              alt="展开图片"
+              maxH="90vh"
+              maxW="90vw"
+              objectFit="contain"
+            />
+            <IconButton
+              aria-label="关闭图片预览"
+              icon={<X size={20} />}
+              position="absolute"
+              top={4}
+              right={4}
+              bg="rgba(0, 0, 0, 0.5)"
+              color="white"
+              variant="solid"
+              borderRadius="full"
+              _hover={{ bg: "rgba(0, 0, 0, 0.7)" }}
+              onClick={() => setIsImageModalOpen(false)}
+            />
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+      
+      {/* PRD内容全屏预览Modal */}
+      <Modal isOpen={isFullscreenModalOpen} onClose={() => setIsFullscreenModalOpen(false)} size="full">
+        <ModalOverlay bg="rgba(0, 0, 0, 0.8)" />
+        <ModalContent bg={bgColor} m={4} borderRadius="lg">
+          <Box p={6} h="100%" display="flex" flexDirection="column">
+            {/* 头部 */}
+            <HStack justify="space-between" align="center" mb={4}>
+              <Text fontSize="xl" fontWeight="bold">
+                PRD内容 - {selectedNode?.data.name || '未命名节点'}
+              </Text>
+              <HStack spacing={2}>
+                <Button
+                  size="sm"
+                  leftIcon={<CopyIcon />}
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(formData.content || '')
+                    toast({
+                      title: '复制成功',
+                      description: 'PRD内容已复制到剪贴板',
+                      status: 'success',
+                      duration: 2000,
+                      isClosable: true,
+                    })
+                  }}
+                >
+                  复制内容
+                </Button>
+                <IconButton
+                  aria-label="关闭"
+                  icon={<CloseIcon />}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIsFullscreenModalOpen(false)}
+                />
+              </HStack>
+            </HStack>
+            
+            {/* 内容区域 */}
+            <Box flex={1}>
+              <MarkdownEditor
+                value={formData.content}
+                onChange={(value) => handleInputChange('content', value)}
+                placeholder="支持 Markdown 格式和标签引用 {标签名}。输入 { 可触发标签自动补全"
+                tags={tags}
+                height={window.innerHeight - 200}
+              />
+            </Box>
+          </Box>
+        </ModalContent>
+      </Modal>
+    </>
   )
 }
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback, useMemo, useEffect } from 'react'
 import {
   ReactFlow,
   Background,
@@ -20,11 +20,21 @@ interface FlowCanvasProps {
   onNodeSelect: (node: CustomNodeType | null) => void
   tags?: {name: string, color: string}[]
   showMiniMap?: boolean
+  initialNodes?: CustomNodeType[]
+  initialEdges?: Edge[]
+  onFlowChange?: (nodes: CustomNodeType[], edges: Edge[]) => void
 }
 
-const FlowCanvas: React.FC<FlowCanvasProps> = ({ onNodeSelect, tags = [], showMiniMap = true }) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState([])
+const FlowCanvas: React.FC<FlowCanvasProps> = ({ 
+  onNodeSelect, 
+  tags = [], 
+  showMiniMap = true,
+  initialNodes = [],
+  initialEdges = [],
+  onFlowChange
+}) => {
+  const [nodes, , onNodesChange] = useNodesState(initialNodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
 
   const bgColor = useColorModeValue('#fafafa', '#1a1a1a')
   const lineColor = useColorModeValue('#e2e8f0', '#2d3748')
@@ -39,15 +49,18 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({ onNodeSelect, tags = [], showMi
     [tags]
   )
 
-  // 处理连接
+  // 处理连接 - 允许手动连接
   const onConnect = useCallback(
-    (params: Connection | Edge) => setEdges((eds) => addEdge(params, eds)),
+    (params: Connection | Edge) => {
+      // 允许手动拖拽连接
+      setEdges((eds) => addEdge(params, eds));
+    },
     [setEdges]
   )
 
   // 处理节点选择
   const onNodeClick = useCallback(
-    (event: React.MouseEvent, node: Node) => {
+    (_event: React.MouseEvent, node: Node) => {
       onNodeSelect(node as CustomNodeType)
     },
     [onNodeSelect]
@@ -57,6 +70,13 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({ onNodeSelect, tags = [], showMi
   const onPaneClick = useCallback(() => {
     onNodeSelect(null)
   }, [onNodeSelect])
+
+  // 监听数据变化并通知父组件
+  useEffect(() => {
+    if (onFlowChange) {
+      onFlowChange(nodes as CustomNodeType[], edges)
+    }
+  }, [nodes, edges, onFlowChange])
 
   return (
     <ReactFlow

@@ -25,13 +25,13 @@ const TaggedText: React.FC<TaggedTextProps> = ({
     return parts.map((part, index) => {
       if (part.match(/^{.*}$/)) {
         const tagName = part.slice(1, -1)
-        const tagData = tags.find(tag => tag.name === tagName)
-        const tagColor = tagData ? tagData.color : 'purple'
+        // const tagData = tags.find(tag => tag.name === tagName)
+        // const tagColor = tagData ? tagData.color : 'purple'
         
         return (
           <Badge 
             key={index} 
-            colorScheme={tagColor} 
+            colorScheme="blue" 
             variant="subtle" 
             mx={1}
             fontSize="xs"
