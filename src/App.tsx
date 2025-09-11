@@ -30,7 +30,7 @@ const saveAnimation = keyframes`
   100% { transform: rotate(360deg); }
 `
 
-function App() {
+function AppContent() { 
   const { colorMode, toggleColorMode } = useColorMode()
   const [selectedNode, setSelectedNode] = useState<CustomNode | null>(null)
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
@@ -155,28 +155,23 @@ function App() {
   // 如果显示项目列表
   if (showProjectList) {
     return (
-      <ChakraProvider theme={theme}>
         <ProjectList onProjectSelect={handleProjectSelect} />
-      </ChakraProvider>
     )
   }
 
   // 如果没有当前项目
   if (!currentProject) {
     return (
-      <ChakraProvider theme={theme}>
         <Box p={4}>
           <Text>请选择一个项目</Text>
           <Button onClick={handleShowProjectList} mt={4}>
             选择项目
           </Button>
         </Box>
-      </ChakraProvider>
     )
   }
 
   return (
-    <ChakraProvider theme={theme}>
       <ReactFlowProvider>
         <Box h="100vh" bg={colorMode === 'light' ? 'gray.50' : 'gray.900'} position="relative">
 
@@ -267,6 +262,13 @@ function App() {
           )}
         </Box>
       </ReactFlowProvider>
+  )
+}
+
+function App() {
+  return (
+    <ChakraProvider theme={theme}>
+      <AppContent />
     </ChakraProvider>
   )
 }

@@ -91,15 +91,21 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
   const modalNodeColor = useColorModeValue('purple.50', 'purple.700')
   const commentNodeColor = useColorModeValue('orange.50', 'orange.700')
   const defaultNodeColor = useColorModeValue('gray.100', 'gray.600')
+  const overviewNodeColor = useColorModeValue('green.50', 'green.700')
+  const requirementNodeColor = useColorModeValue('yellow.50', 'yellow.700')
 
   const pageBorderColor = useColorModeValue('blue.400', 'blue.300')
   const modalBorderColor = useColorModeValue('purple.400', 'purple.300')
   const commentBorderColor = useColorModeValue('orange.400', 'orange.300')
+  const overviewBorderColor = useColorModeValue('green.400', 'green.300')
+  const requirementBorderColor = useColorModeValue('yellow.400', 'yellow.300')
   const defaultBorderColor = useColorModeValue('gray.300', 'gray.400')
 
   const pageIconColor = useColorModeValue('blue.600', 'blue.200')
   const modalIconColor = useColorModeValue('purple.600', 'purple.200')
   const commentIconColor = useColorModeValue('orange.600', 'orange.200')
+  const overviewIconColor = useColorModeValue('green.600', 'green.200')
+  const requirementIconColor = useColorModeValue('yellow.600', 'yellow.200')
   const defaultIconColor = useColorModeValue('gray.600', 'gray.300')
 
   // 列表项悬浮颜色
@@ -111,6 +117,8 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
       case 'page': return pageNodeColor
       case 'modal': return modalNodeColor
       case 'comment': return commentNodeColor
+      case 'overview': return overviewNodeColor
+      case 'requirement': return requirementNodeColor
       default: return defaultNodeColor
     }
   }
@@ -120,6 +128,8 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
       case 'page': return pageBorderColor
       case 'modal': return modalBorderColor
       case 'comment': return commentBorderColor
+      case 'overview': return overviewBorderColor
+      case 'requirement': return requirementBorderColor
       default: return defaultBorderColor
     }
   }
@@ -129,6 +139,8 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
       case 'page': return pageIconColor
       case 'modal': return modalIconColor
       case 'comment': return commentIconColor
+      case 'overview': return overviewIconColor
+      case 'requirement': return requirementIconColor
       default: return defaultIconColor
     }
   }
@@ -138,6 +150,8 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
       case 'page': return '💻'
       case 'modal': return '📰'
       case 'comment': return '💡'
+      case 'overview': return '🌍'
+      case 'requirement': return '📝'
       default: return '💻'
     }
   }

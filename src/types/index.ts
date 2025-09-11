@@ -13,22 +13,20 @@ export interface NodeData {
 }
 
 export interface CustomNode extends Node {
-  data: NodeData
+  data: {
+    id: string;
+    name: string;
+    type: 'page' | 'modal' | 'comment' | 'overview' | 'requirement';
+    content?: string;
+    description?: string;
+    customItems?: { id: string; name: string }[];
+    tags?: string[];
+    image?: string;
+    disabled?: boolean;
+    files?: { name: string; url: string }[]; // 新增文件列表
+  };
 }
 
-export interface FlowState {
-  nodes: CustomNode[]
-  edges: Edge[]
-  selectedNode: CustomNode | null
-}
-
-export interface NodeFormData {
-  name: string
-  content: string
-  description?: string
-}
-
-// 标签类型定义
 export interface Tag {
   id: string
   name: string

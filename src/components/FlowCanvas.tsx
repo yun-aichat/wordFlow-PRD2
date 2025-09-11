@@ -11,6 +11,7 @@ import {
   Edge,
   Node,
   NodeTypes,
+  useReactFlow,
 } from 'reactflow'
 import { useColorModeValue } from '@chakra-ui/react'
 import CustomNode from './CustomNode'
@@ -33,8 +34,9 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
   initialEdges = [],
   onFlowChange
 }) => {
-  const [nodes, , onNodesChange] = useNodesState(initialNodes)
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const reactFlowInstance = useReactFlow();
 
   const bgColor = useColorModeValue('#fafafa', '#1a1a1a')
   const lineColor = useColorModeValue('#e2e8f0', '#2d3748')
@@ -71,6 +73,42 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
     onNodeSelect(null)
   }, [onNodeSelect])
 
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
+      const draggedNode = JSON.parse(event.dataTransfer.getData('application/reactflow'));
+
+      // check if the dropped element is valid
+      if (typeof draggedNode === 'undefined' || !draggedNode) {
+        return;
+      }
+
+      const position = reactFlowInstance.project({
+        x: event.clientX - reactFlowBounds.left,
+        y: event.clientY - reactFlowBounds.top,
+      });
+
+      const isNodePresent = nodes.some((n) => n.id === draggedNode.id);
+
+      if (!isNodePresent) {
+        // It's a new node from the sidebar, add it
+        const newNode = {
+          ...draggedNode,
+          position,
+        };
+        setNodes((nds) => nds.concat(newNode));
+      }
+    },
+    [reactFlowInstance, nodes, setNodes]
+  );
+
   // 监听数据变化并通知父组件
   useEffect(() => {
     if (onFlowChange) {
@@ -88,6 +126,8 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
       onNodeClick={onNodeClick}
       onPaneClick={onPaneClick}
       nodeTypes={nodeTypes}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
       fitView
       attributionPosition="bottom-left"
       style={{

@@ -32,7 +32,7 @@ import {
   FormControl,
   FormLabel,
 } from '@chakra-ui/react'
-import { Plus, MessageSquare, List, Tag, Map, ArrowLeft, Search, ChevronDown, ChevronRight, Edit } from 'lucide-react'
+import { Plus, MessageSquare, List, Tag, Map, ArrowLeft, Search, ListChevronsDownUp, ListChevronsUpDown, Edit, Container, GripVertical } from 'lucide-react'
 import { useReactFlow } from 'reactflow'
 import { v4 as uuidv4 } from 'uuid'
 import { CustomNode, Tag as TagType } from '../types'
@@ -76,7 +76,26 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
   const hoverBg = useColorModeValue('gray.50', 'gray.700')
   const iconColor = useColorModeValue('gray.600', 'gray.300')
 
-  const addNode = (type: 'page' | 'modal') => {
+  const addNode = (type: 'page' | 'modal' | 'overview' | 'requirement') => {
+    let name = ''
+    let content = '# 标题\n\n在这里编写内容...'
+    switch (type) {
+      case 'page':
+        name = '新页面'
+        break
+      case 'modal':
+        name = '新弹窗'
+        break
+      case 'overview':
+        name = '全局概览'
+        content = '# 全局概览\n\n描述项目的整体架构、核心流程和关键组件...'
+        break
+      case 'requirement':
+        name = '需求描述'
+        content = '# 需求描述\n\n详细描述功能需求、用户故事和验收标准...'
+        break
+    }
+
     const newNode: CustomNode = {
       id: uuidv4(),
       type: 'custom',
@@ -86,9 +105,9 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
       },
       data: {
         id: uuidv4(),
-        name: type === 'page' ? '新页面' : '新弹窗',
+        name,
         type,
-        content: '# 标题\n\n在这里编写内容...',
+        content,
         description: '',
       },
     }
@@ -224,16 +243,13 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
             </Text>
             
             {/* 搜索输入框 */}
-            <HStack spacing={2}>
-              <Search size={16} color="gray.500" />
-              <Input
-                size="sm"
-                placeholder="搜索节点名称..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                variant="filled"
-              />
-            </HStack>
+            <Input
+              size="sm"
+              placeholder="搜索节点名称..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              variant="filled"
+            />
           </VStack>
           
           <VStack spacing={2} align="stretch" maxH="calc(100vh - 140px)" overflowY="auto" mt={3}>
@@ -245,12 +261,20 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
                 cursor="pointer"
                 onClick={() => handleNodeClick(node.id)}
                 _hover={{ shadow: 'md', borderColor: 'blue.300' }}
+                draggable
+                onDragStart={(event) => {
+                  event.dataTransfer.setData('application/reactflow', JSON.stringify(node));
+                  event.dataTransfer.effectAllowed = 'move';
+                }}
               >
                 <CardBody p={3}>
                   <HStack spacing={2}>
+                    <GripVertical size={16} color="gray.400" />
                     <Text fontSize="lg">
                        {node.data.type === 'page' ? '💻' : 
-                        node.data.type === 'modal' ? '📰' : '💡'}
+                        node.data.type === 'modal' ? '📰' : 
+                        node.data.type === 'overview' ? '🌍' :
+                        node.data.type === 'requirement' ? '📝' : '💡'}
                      </Text>
                     <VStack align="start" spacing={0} flex={1}>
                       <Text fontSize="sm" fontWeight="medium" noOfLines={1}>
@@ -286,7 +310,7 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
             </Text>
             <IconButton
               aria-label={allTagsExpanded ? "收缩全部" : "展开全部"}
-              icon={allTagsExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              icon={allTagsExpanded ? <ListChevronsUpDown size={16} /> : <ListChevronsDownUp size={16} />}
               size="sm"
               variant="ghost"
               onClick={toggleAllTags}
@@ -388,7 +412,7 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
               )}
               
               {/* 添加节点功能 */}
-              <Popover isOpen={isAddNodeOpen} onClose={onAddNodeClose}>
+              <Popover isOpen={isAddNodeOpen} onOpen={onAddNodeOpen} onClose={onAddNodeClose}>
                 <PopoverTrigger>
                   <Box>
                     <Tooltip label="添加节点" placement="right">
@@ -399,7 +423,6 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
                         variant="ghost"
                         color={iconColor}
                         _hover={{ bg: hoverBg, color: 'blue.500' }}
-                        onClick={onAddNodeOpen}
                       />
                     </Tooltip>
                   </Box>
@@ -426,6 +449,26 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
                         onClick={() => addNode('modal')}
                       >
                         弹窗
+                      </Button>
+                      <Button
+                        size="sm"
+                        w="100%"
+                        leftIcon={<Text>🌍</Text>}
+                        colorScheme="green"
+                        variant="outline"
+                        onClick={() => addNode('overview')}
+                      >
+                        全局概览
+                      </Button>
+                      <Button
+                        size="sm"
+                        w="100%"
+                        leftIcon={<Text>📝</Text>}
+                        colorScheme="yellow"
+                        variant="outline"
+                        onClick={() => addNode('requirement')}
+                      >
+                        需求描述
                       </Button>
                     </VStack>
                   </PopoverBody>
@@ -492,35 +535,6 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
         </Card>
       </Box>
       
-      {/* 添加节点弹窗 */}
-      <Modal isOpen={isAddNodeOpen} onClose={onAddNodeClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>添加新节点</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={3}>
-              <Button
-                w="full"
-                leftIcon={<MessageSquare size={16} />}
-                onClick={() => addNode('page')}
-                colorScheme="blue"
-              >
-                添加页面
-              </Button>
-              <Button
-                w="full"
-                leftIcon={<MessageSquare size={16} />}
-                onClick={() => addNode('modal')}
-                colorScheme="purple"
-              >
-                添加弹窗
-              </Button>
-            </VStack>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
-
       {/* 标签编辑弹窗 */}
       <Modal isOpen={isEditTagOpen} onClose={onEditTagClose}>
         <ModalOverlay />

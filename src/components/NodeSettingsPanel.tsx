@@ -35,9 +35,12 @@ import {
   MenuButton,
   MenuList,
   MenuItem,
+  Tag as ChakraTag,
+  TagLabel,
+  TagCloseButton,
 } from '@chakra-ui/react'
-import { CloseIcon, CopyIcon, ViewIcon, ViewOffIcon } from '@chakra-ui/icons'
-import { Upload, X, Maximize2 } from 'lucide-react'
+import { CloseIcon, CopyIcon, ViewIcon, ViewOffIcon, DownloadIcon } from '@chakra-ui/icons'
+import { Upload, X, Maximize2, Paperclip } from 'lucide-react'
 import { useReactFlow } from 'reactflow'
 import { CustomNode, NodeFormData } from '../types'
 // import TagInput from './TagInput'
@@ -66,7 +69,10 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
   const [isFullscreenModalOpen, setIsFullscreenModalOpen] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isImageModalOpen, setIsImageModalOpen] = useState(false)
+  const [tabIndex, setTabIndex] = useState(0)
+  const [files, setFiles] = useState<{ name: string; url: string }[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
   const autoSaveTimeoutRef = useRef<number | null>(null)
   const reactFlowInstance = useReactFlow()
   const toast = useToast()
@@ -82,6 +88,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
         description: selectedNode.data.description || '',
       })
       setSelectedImage(selectedNode.data.image || null)
+      setFiles(selectedNode.data.files || [])
     }
   }, [selectedNode])
 
@@ -102,31 +109,33 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
   // 添加粘贴事件监听器
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
-      const items = e.clipboardData?.items;
-      if (items) {
-        for (let i = 0; i < items.length; i++) {
-          const item = items[i];
-          if (item.type.indexOf('image') !== -1) {
-            const file = item.getAsFile();
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = (event) => {
-                const result = event.target?.result as string;
-                setSelectedImage(result);
-              };
-              reader.readAsDataURL(file);
-            }
-            break;
-          }
-        }
-      }
+      // if (tabIndex !== 1) return; // 仅在“基本信息”选项卡生效
+
+      // const items = e.clipboardData?.items;
+      // if (items) {
+      //   for (let i = 0; i < items.length; i++) {
+      //     const item = items[i];
+      //     if (item.type.indexOf('image') !== -1) {
+      //       const file = item.getAsFile();
+      //       if (file) {
+      //         const reader = new FileReader();
+      //         reader.onload = (event) => {
+      //           const result = event.target?.result as string;
+      //           setSelectedImage(result);
+      //         };
+      //         reader.readAsDataURL(file);
+      //       }
+      //       break;
+      //     }
+      //   }
+      // }
     };
 
     document.addEventListener('paste', handlePaste);
     return () => {
       document.removeEventListener('paste', handlePaste);
     };
-  }, [])
+  }, [tabIndex])
 
   // 自动保存功能
   useEffect(() => {
@@ -147,6 +156,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
           content: formData.content,
           description: formData.description,
           image: selectedImage || undefined,
+          files: files,
         },
       }
 
@@ -166,13 +176,34 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
         clearTimeout(autoSaveTimeoutRef.current)
       }
     }
-  }, [formData, selectedImage, selectedNode, reactFlowInstance, onNodeUpdate])
+  }, [formData, selectedImage, files, selectedNode, reactFlowInstance, onNodeUpdate])
 
   const handleInputChange = (field: keyof NodeFormData, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: value,
     }))
+  }
+
+  const handleImagePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const items = e.clipboardData?.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf('image') !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const result = event.target?.result as string;
+              setSelectedImage(result);
+            };
+            reader.readAsDataURL(file);
+          }
+          break;
+        }
+      }
+    }
   }
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -185,6 +216,31 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
       }
       reader.readAsDataURL(file)
     }
+  }
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const result = e.target?.result as string
+        setFiles(prev => [...prev, { name: file.name, url: result }])
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleFileDownload = (file: { name: string; url: string }) => {
+    const link = document.createElement('a')
+    link.href = file.url
+    link.download = file.name
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const handleFileDelete = (fileName: string) => {
+    setFiles(prev => prev.filter(f => f.name !== fileName))
   }
 
   const handleToggleDisabled = () => {
@@ -259,7 +315,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
     })
   }
 
-  const handleTypeChange = (newType: 'page' | 'modal') => {
+  const handleTypeChange = (newType: 'page' | 'modal' | 'overview' | 'requirement') => {
     if (!selectedNode) return
 
     const updatedNode: CustomNode = {
@@ -343,7 +399,12 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                         <MenuButton
                           as={IconButton}
                           aria-label="选择类型"
-                          icon={<Text fontSize="lg">{selectedNode.data.type === 'page' ? '💻' : '📰'}</Text>}
+                          icon={<Text fontSize="lg">{
+                            selectedNode.data.type === 'page' ? '💻' :
+                            selectedNode.data.type === 'modal' ? '📰' :
+                            selectedNode.data.type === 'overview' ? '🌍' :
+                            selectedNode.data.type === 'requirement' ? '📝' : '💡'
+                          }</Text>}
                           size="sm"
                           variant="ghost"
                           borderRadius="md 0 0 md"
@@ -362,6 +423,18 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                             <HStack spacing={2}>
                               <Text>📰</Text>
                               <Text>弹窗</Text>
+                            </HStack>
+                          </MenuItem>
+                          <MenuItem onClick={() => handleTypeChange('overview')}>
+                            <HStack spacing={2}>
+                              <Text>🌍</Text>
+                              <Text>全局概览</Text>
+                            </HStack>
+                          </MenuItem>
+                          <MenuItem onClick={() => handleTypeChange('requirement')}>
+                            <HStack spacing={2}>
+                              <Text>📝</Text>
+                              <Text>需求描述</Text>
                             </HStack>
                           </MenuItem>
                         </MenuList>
@@ -413,14 +486,21 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                            />
                         </Box>
                       )}
-                      <Button
-                        size="sm"
-                        leftIcon={<Upload size={14} />}
-                        variant="outline"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        {selectedImage ? '更换图片' : '上传或粘贴图片'}
-                      </Button>
+                      <HStack>
+                        <Input
+                          size="sm"
+                          placeholder="粘贴图片或点击右侧按钮上传"
+                          onPaste={handleImagePaste}
+                          flex={1}
+                        />
+                        <IconButton
+                          aria-label="上传图片"
+                          icon={<Upload size={14} />}
+                          size="sm"
+                          variant="outline"
+                          onClick={() => fileInputRef.current?.click()}
+                        />
+                      </HStack>
                       <input
                         ref={fileInputRef}
                         type="file"
@@ -560,11 +640,12 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
             {/* 内容区域 */}
             <Box flex={1}>
               <MarkdownEditor
-                value={formData.content}
+                value={formData.content || ''}
                 onChange={(value) => handleInputChange('content', value)}
                 placeholder="支持 Markdown 格式和标签引用 {标签名}。输入 { 可触发标签自动补全"
                 tags={tags}
                 height={window.innerHeight - 200}
+                enableImagePaste={true} // 在PRD编辑器中启用图片粘贴
               />
             </Box>
           </Box>
