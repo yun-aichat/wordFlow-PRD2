@@ -185,6 +185,40 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
     }))
   }
 
+  const handleImageFile = async (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const response = await fetch('/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Image upload failed');
+      }
+
+      const data = await response.json();
+      setSelectedImage(data.imageUrl);
+      toast({
+        title: '图片上传成功',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: '图片上传失败',
+        description: '请检查后端服务是否正常运行。',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
   const handleImagePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     const items = e.clipboardData?.items;
     if (items) {
@@ -193,30 +227,20 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
         if (item.type.indexOf('image') !== -1) {
           const file = item.getAsFile();
           if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              const result = event.target?.result as string;
-              setSelectedImage(result);
-            };
-            reader.readAsDataURL(file);
+            handleImageFile(file);
           }
           break;
         }
       }
     }
-  }
+  };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+    const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const result = e.target?.result as string
-        setSelectedImage(result)
-      }
-      reader.readAsDataURL(file)
+      handleImageFile(file);
     }
-  }
+  };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]

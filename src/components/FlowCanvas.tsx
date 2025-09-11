@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useEffect } from 'react'
+import React, { useCallback, useMemo, useEffect, useRef } from 'react'
 import {
   ReactFlow,
   Background,
@@ -12,6 +12,8 @@ import {
   Node,
   NodeTypes,
   useReactFlow,
+  applyNodeChanges,
+  applyEdgeChanges,
 } from 'reactflow'
 import { useColorModeValue } from '@chakra-ui/react'
 import CustomNode from './CustomNode'
@@ -34,9 +36,50 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
   initialEdges = [],
   onFlowChange
 }) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const [nodes, setNodes] = useNodesState(initialNodes)
+  const [edges, setEdges] = useEdgesState(initialEdges)
+  
+
+  
+  // 自定义节点变化处理，只在拖拽结束时保存历史记录
+  const onNodesChange = useCallback((changes) => {
+    // 只在拖拽结束时保存历史记录
+    const { past } = historyRef.current;
+    if (changes.length > 0 && changes[0].type === 'position' && changes[0].dragging === false) {
+      // 只保留最新的20次操作
+      const newPast = [...past, { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }];
+      const limitedPast = newPast.length > 20 ? newPast.slice(-20) : newPast;
+      
+      historyRef.current = {
+        past: limitedPast,
+        future: []
+      };
+    }
+    setNodes((nds) => applyNodeChanges(changes, nds));
+  }, [nodes, edges, setNodes]);
+  
+  // 自定义边变化处理，只在操作完成时保存历史记录
+  const onEdgesChange = useCallback((changes) => {
+    // 只在边删除或操作完成时保存历史记录
+    const { past } = historyRef.current;
+    if (changes.length > 0 && (changes[0].type === 'remove')) {
+      // 只保留最新的20次操作
+      const newPast = [...past, { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }];
+      const limitedPast = newPast.length > 20 ? newPast.slice(-20) : newPast;
+      
+      historyRef.current = {
+        past: limitedPast,
+        future: []
+      };
+    }
+    setEdges((eds) => applyEdgeChanges(changes, eds));
+  }, [nodes, edges, setEdges]);
   const reactFlowInstance = useReactFlow();
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  
+  // 历史记录管理
+  const historyRef = useRef<{past: {nodes: Node[], edges: Edge[]}[], future: {nodes: Node[], edges: Edge[]}[]}>({past: [], future: []});
+  const selectedNodeId = useRef<string | null>(null);
 
   const bgColor = useColorModeValue('#fafafa', '#1a1a1a')
   const lineColor = useColorModeValue('#e2e8f0', '#2d3748')
@@ -54,23 +97,36 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
   // 处理连接 - 允许手动连接
   const onConnect = useCallback(
     (params: Connection | Edge) => {
+      // 保存当前状态到历史记录
+      const { past } = historyRef.current;
+      // 只保留最新的20次操作
+      const newPast = [...past, { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }];
+      const limitedPast = newPast.length > 20 ? newPast.slice(-20) : newPast;
+      
+      historyRef.current = {
+        past: limitedPast,
+        future: []
+      };
+      
       // 允许手动拖拽连接
       setEdges((eds) => addEdge(params, eds));
     },
-    [setEdges]
+    [nodes, edges, setEdges]
   )
 
   // 处理节点选择
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
-      onNodeSelect(node as CustomNodeType)
+      onNodeSelect(node as CustomNodeType);
+      selectedNodeId.current = node.id;
     },
     [onNodeSelect]
   )
 
   // 处理画布点击（取消选择）
   const onPaneClick = useCallback(() => {
-    onNodeSelect(null)
+    onNodeSelect(null);
+    selectedNodeId.current = null;
   }, [onNodeSelect])
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -98,6 +154,17 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
       const isNodePresent = nodes.some((n) => n.id === draggedNode.id);
 
       if (!isNodePresent) {
+        // 保存当前状态到历史记录
+        const { past } = historyRef.current;
+        // 只保留最新的20次操作
+        const newPast = [...past, { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }];
+        const limitedPast = newPast.length > 20 ? newPast.slice(-20) : newPast;
+        
+        historyRef.current = {
+          past: limitedPast,
+          future: []
+        };
+        
         // It's a new node from the sidebar, add it
         const newNode = {
           ...draggedNode,
@@ -106,8 +173,84 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
         setNodes((nds) => nds.concat(newNode));
       }
     },
-    [reactFlowInstance, nodes, setNodes]
+    [reactFlowInstance, nodes, edges, setNodes]
   );
+
+  // 保存当前状态到历史记录
+  const saveToHistory = useCallback(() => {
+    const { past } = historyRef.current;
+    // 只保留最新的20次操作
+    const newPast = [...past, { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }];
+    const limitedPast = newPast.length > 20 ? newPast.slice(-20) : newPast;
+    
+    historyRef.current = {
+      past: limitedPast,
+      future: []
+    };
+  }, [nodes, edges]);
+
+  // 撤销操作
+  const undo = useCallback(() => {
+    const { past, future } = historyRef.current;
+    if (past.length === 0) return;
+
+    const newPast = [...past];
+    const present = newPast.pop();
+    if (!present) return;
+
+    historyRef.current = {
+      past: newPast,
+      future: [{ nodes, edges }, ...future]
+    };
+
+    setNodes(present.nodes);
+    setEdges(present.edges);
+  }, [nodes, edges, setNodes, setEdges]);
+
+  // 删除选中的节点
+  const deleteSelectedNode = useCallback(() => {
+    if (selectedNodeId.current) {
+      // 保存当前状态到历史记录
+      const { past } = historyRef.current;
+      // 只保留最新的20次操作
+      const newPast = [...past, { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }];
+      const limitedPast = newPast.length > 20 ? newPast.slice(-20) : newPast;
+      
+      historyRef.current = {
+        past: limitedPast,
+        future: []
+      };
+      
+      setNodes((nds) => nds.filter((node) => node.id !== selectedNodeId.current));
+      setEdges((eds) => eds.filter(
+        (edge) => edge.source !== selectedNodeId.current && edge.target !== selectedNodeId.current
+      ));
+      selectedNodeId.current = null;
+      onNodeSelect(null);
+    }
+  }, [nodes, edges, setNodes, setEdges, onNodeSelect]);
+
+  // 键盘事件处理
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ctrl+Z 撤销
+      if (event.ctrlKey && event.key === 'z') {
+        event.preventDefault();
+        undo();
+      }
+      
+      // Delete 删除选中节点
+      if (event.key === 'Delete' && selectedNodeId.current) {
+        event.preventDefault();
+        deleteSelectedNode();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [undo, deleteSelectedNode]);
 
   // 监听数据变化并通知父组件
   useEffect(() => {

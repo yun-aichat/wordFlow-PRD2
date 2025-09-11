@@ -32,7 +32,7 @@ import {
   FormControl,
   FormLabel,
 } from '@chakra-ui/react'
-import { Plus, MessageSquare, List, Tag, Map, ArrowLeft, Search, ListChevronsDownUp, ListChevronsUpDown, Edit, Container, GripVertical } from 'lucide-react'
+import { Plus, MessageSquare, List, Tag, Map, ArrowLeft, Search, ListChevronsDownUp, ListChevronsUpDown, Edit, Container, GripVertical, Download } from 'lucide-react'
 import { useReactFlow } from 'reactflow'
 import { v4 as uuidv4 } from 'uuid'
 import { CustomNode, Tag as TagType } from '../types'
@@ -44,6 +44,7 @@ interface SidebarProps {
   onMiniMapToggle?: () => void
   onBackToProjectList?: () => void
   onNodeSelect?: (node: CustomNode) => void
+  onExport?: () => void
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = true, onMiniMapToggle, onBackToProjectList, onNodeSelect }) => {
@@ -68,6 +69,7 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
   const [searchQuery, setSearchQuery] = useState('')
   const { isOpen: isAddNodeOpen, onOpen: onAddNodeOpen, onClose: onAddNodeClose } = useDisclosure()
   const { isOpen: isEditTagOpen, onOpen: onEditTagOpen, onClose: onEditTagClose } = useDisclosure()
+  const { isOpen: isExportOpen, onOpen: onExportOpen, onClose: onExportClose } = useDisclosure()
   const reactFlowInstance = useReactFlow()
   const toast = useToast()
   
@@ -530,6 +532,19 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
                    onClick={onMiniMapToggle}
                  />
                </Tooltip>
+               
+               {/* 导出功能 */}
+               <Tooltip label="导出项目" placement="right">
+                 <IconButton
+                   aria-label="导出项目"
+                   icon={<Download size={16} />}
+                   size="sm"
+                   variant="ghost"
+                   color={iconColor}
+                   _hover={{ bg: hoverBg, color: 'blue.500' }}
+                   onClick={onExportOpen}
+                 />
+               </Tooltip>
             </VStack>
           </CardBody>
         </Card>
@@ -569,6 +584,145 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
             </Button>
             <Button colorScheme="blue" onClick={() => editingTag && saveTagEdit(editingTag)}>
               保存
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* 导出项目弹窗 */}
+      <Modal isOpen={isExportOpen} onClose={onExportClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>导出项目</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4} align="stretch">
+              <Text>选择导出格式：</Text>
+              
+              <Button 
+                leftIcon={<Download size={16} />} 
+                colorScheme="blue" 
+                onClick={() => {
+                  // 获取所有节点数据
+                  const allNodes = reactFlowInstance.getNodes() as CustomNode[];
+                  const allEdges = reactFlowInstance.getEdges();
+                  
+                  // 创建HTML内容
+                  let htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PRD导出文档</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
+    h1 { color: #2c5282; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+    h2 { color: #2d3748; margin-top: 30px; }
+    img { max-width: 100%; border: 1px solid #e2e8f0; border-radius: 4px; }
+    .node { margin-bottom: 40px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .node-title { display: flex; align-items: center; margin-bottom: 15px; }
+    .node-icon { margin-right: 10px; font-size: 24px; }
+    .node-name { font-size: 20px; font-weight: bold; }
+    .node-description { color: #4a5568; margin-bottom: 15px; }
+    .node-content { background-color: #f7fafc; padding: 15px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>PRD文档</h1>
+`;
+                  
+                  // 添加节点内容
+                  allNodes.forEach(node => {
+                    if (node.data.type !== 'comment') {
+                      const nodeIcon = 
+                        node.data.type === 'page' ? '💻' : 
+                        node.data.type === 'modal' ? '📰' : 
+                        node.data.type === 'overview' ? '🌍' :
+                        node.data.type === 'requirement' ? '📝' : '📄';
+                      
+                      htmlContent += `
+  <div class="node">
+    <div class="node-title">
+      <span class="node-icon">${nodeIcon}</span>
+      <span class="node-name">${node.data.name}</span>
+    </div>
+`;
+                      
+                      if (node.data.description) {
+                        htmlContent += `    <div class="node-description">${node.data.description}</div>
+`;
+                      }
+                      
+                      if (node.data.content) {
+                        // 将Markdown内容转换为HTML (简单处理)
+                        const contentHtml = node.data.content
+                          .replace(/\n\n/g, '<br><br>')
+                          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                          .replace(/\#\# (.*?)\n/g, '<h2>$1</h2>')
+                          .replace(/\# (.*?)\n/g, '<h1>$1</h1>')
+                          .replace(/\!\[\]\((.*?)\)/g, '<img src="$1" alt="" />');
+                          
+                        htmlContent += `    <div class="node-content">${contentHtml}</div>
+`;
+                      }
+                      
+                      htmlContent += `  </div>
+`;
+                    }
+                  });
+                  
+                  htmlContent += `</body>
+</html>`;
+                  
+                  // 创建下载链接
+                  const blob = new Blob([htmlContent], { type: 'text/html' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'prd-export.html';
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                  
+                  toast({
+                    title: '导出成功',
+                    description: 'PRD文档已成功导出为HTML文件',
+                    status: 'success',
+                    duration: 3000,
+                    isClosable: true,
+                  });
+                  
+                  onExportClose();
+                }}
+              >
+                导出为HTML文档
+              </Button>
+              
+              <Button 
+                leftIcon={<Download size={16} />} 
+                colorScheme="teal"
+                onClick={() => {
+                  // 获取React Flow实例的视图
+                  const dataUrl = reactFlowInstance.toObject();
+                  
+                  toast({
+                    title: '功能开发中',
+                    description: '导出为图片功能正在开发中，敬请期待',
+                    status: 'info',
+                    duration: 3000,
+                    isClosable: true,
+                  });
+                }}
+              >
+                导出为图片 (开发中)
+              </Button>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" onClick={onExportClose}>
+              取消
             </Button>
           </ModalFooter>
         </ModalContent>

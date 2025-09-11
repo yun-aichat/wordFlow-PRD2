@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import MDEditor, { commands } from '@uiw/react-md-editor'
-import { Box, useColorModeValue, Portal, VStack, Text, Button, Badge, Tooltip } from '@chakra-ui/react'
+import { Box, useColorModeValue, Portal, VStack, Text, Button, Badge, Tooltip, useToast } from '@chakra-ui/react'
 import { Tag as TagIcon } from 'lucide-react' // 导入 Tag 图标
 import { Tag } from '../types'
 import { remarkTagHighlight, getTagSuggestions } from '../utils/remarkTagPlugin'
@@ -58,67 +58,210 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [suggestionPosition, setSuggestionPosition] = useState({ x: 0, y: 0 })
+  
+  // 添加历史记录状态，用于撤销功能
+  const historyRef = useRef<{
+    past: string[];
+    future: string[];
+  }>({ past: [], future: [] });
   const [selectedSuggestion, setSelectedSuggestion] = useState(0)
   const mdEditorRef = useRef<any>(null)
+  const toast = useToast()
   
   // const bgColor = useColorModeValue('white', 'gray.800')
   // const borderColor = useColorModeValue('gray.200', 'gray.600')
   const suggestionBg = useColorModeValue('white', 'gray.700')
   const suggestionBorder = useColorModeValue('gray.200', 'gray.600')
 
-  useEffect(() => {
-    const textarea = mdEditorRef.current?.textarea;
-    if (!textarea) return;
+  // 撤销操作
+  const undo = useCallback(() => {
+    const { past, future } = historyRef.current;
+    if (past.length === 0) return;
 
-    const handlePaste = (event: ClipboardEvent) => {
-      const items = event.clipboardData?.items;
-      if (!items) return;
+    const newPast = [...past];
+    const previous = newPast.pop();
+    const newFuture = [value, ...future];
 
-      const imageItem = Array.from(items).find(item => item.type.startsWith('image/'));
+    historyRef.current = {
+      past: newPast,
+      future: newFuture
+    };
 
-      if (imageItem) {
-        const file = imageItem.getAsFile();
-        if (file) {
-          event.preventDefault();
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const imageUrl = e.target?.result as string;
-            if (imageUrl) {
-              const markdownImage = `![](${imageUrl})`;
-              const { selectionStart, selectionEnd } = textarea;
-              const newValue =
-                value.substring(0, selectionStart) +
-                markdownImage +
-                value.substring(selectionEnd);
-              onChange(newValue);
-              
-              // Move cursor after inserted image
-              setTimeout(() => {
-                const newCursorPos = selectionStart + markdownImage.length;
-                textarea.setSelectionRange(newCursorPos, newCursorPos);
-                textarea.focus();
-              }, 0);
-            }
-          };
-          reader.onerror = (error) => {
-            console.error("Failed to read file:", error);
-            // Optionally show an error to the user
-          };
-          reader.readAsDataURL(file);
+    if (previous !== undefined) {
+      onChange(previous);
+    }
+  }, [value, onChange]);
+
+  // 处理粘贴事件
+  const handlePaste = useCallback(async (event: ClipboardEvent) => {
+    console.log('粘贴事件触发');
+    const items = event.clipboardData?.items;
+    if (!items) {
+      console.log('没有粘贴项');
+      return;
+    }
+
+    console.log('粘贴项数量:', items.length);
+    let hasImage = false;
+    
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      console.log('粘贴项类型:', item.type);
+      
+      if (item.type.startsWith('image/')) {
+        hasImage = true;
+        const file = item.getAsFile();
+        if (!file) {
+          console.log('无法获取文件');
+          continue;
         }
+        
+        console.log('获取到图片文件:', file.name, file.size);
+        event.preventDefault();
+        
+        const textarea = document.querySelector('.w-md-editor-text-input') as HTMLTextAreaElement;
+        if (!textarea) {
+          console.error('找不到文本区域元素');
+          return;
+        }
+        
+        // 显示临时占位符
+        const placeholderText = '![上传中...]()'; 
+        const selectionStart = textarea.selectionStart;
+        const selectionEnd = textarea.selectionEnd;
+        const newValue =
+          value.substring(0, selectionStart) +
+          placeholderText +
+          value.substring(selectionEnd);
+        onChange(newValue);
+        
+        // 上传图片到后端
+        try {
+          const formData = new FormData();
+          formData.append('image', file);
+          console.log('准备上传图片');
+          
+          const response = await fetch('/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          console.log('上传响应状态:', response.status);
+          if (!response.ok) {
+            throw new Error('Image upload failed');
+          }
+          
+          const data = await response.json();
+          console.log('上传响应数据:', data);
+          const imageUrl = data.imageUrl;
+          const isDuplicate = data.isDuplicate;
+          
+          // 替换占位符为实际图片链接
+          const markdownImage = `![](${imageUrl})`;
+          
+          // 如果是重复图片，不显示提示信息（根据需求1）
+          
+          const currentValue = textarea.value;
+          const placeholderIndex = currentValue.indexOf('![上传中...]()'); 
+          
+          console.log('占位符索引:', placeholderIndex);
+          if (placeholderIndex !== -1) {
+            const updatedValue =
+              currentValue.substring(0, placeholderIndex) +
+              markdownImage +
+              currentValue.substring(placeholderIndex + '![上传中...]()'.length);
+            onChange(updatedValue);
+            console.log('已替换占位符为图片链接');
+            
+            // 移动光标到插入图片后的位置
+            const newCursorPos = placeholderIndex + markdownImage.length;
+            setTimeout(() => {
+              textarea.setSelectionRange(newCursorPos, newCursorPos);
+              textarea.focus();
+            }, 0);
+          }
+        } catch (error) {
+          console.error('上传图片失败:', error);
+          // 上传失败，移除占位符
+          const currentValue = textarea.value;
+          const placeholderIndex = currentValue.indexOf('![上传中...]()'); 
+          
+          if (placeholderIndex !== -1) {
+            const updatedValue =
+              currentValue.substring(0, placeholderIndex) +
+              currentValue.substring(placeholderIndex + '![上传中...]()'.length);
+            onChange(updatedValue);
+            console.log('已移除占位符');
+          }
+        }
+      }
+    }
+  }, [value, onChange]);
+
+  useEffect(() => {
+    // 使用 setTimeout 确保编辑器已经完全渲染
+    const timeoutId = setTimeout(() => {
+      const textarea = document.querySelector('.w-md-editor-text-input') as HTMLTextAreaElement;
+      if (!textarea) {
+        console.error('找不到文本区域元素');
+        return;
+      }
+
+      console.log('找到文本区域元素:', textarea);
+      textarea.addEventListener('paste', handlePaste);
+    }, 500);
+
+    // 设置键盘事件监听器，用于撤销操作
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 检测 Ctrl+Z 或 Command+Z
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        undo();
       }
     };
 
-    textarea.addEventListener('paste', handlePaste);
+    document.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      textarea.removeEventListener('paste', handlePaste);
+      clearTimeout(timeoutId);
+      // 清理历史记录保存定时器
+      if (saveHistoryTimeoutRef.current) {
+        clearTimeout(saveHistoryTimeoutRef.current);
+      }
+      const textarea = document.querySelector('.w-md-editor-text-input') as HTMLTextAreaElement;
+      textarea?.removeEventListener('paste', handlePaste);
+      document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [value, onChange]);
+  }, [handlePaste, undo]);
 
+  // 用于延迟保存历史记录的定时器
+  const saveHistoryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   // 处理标签自动补全
   const handleEditorChange = useCallback((val?: string) => {
     if (val !== undefined) {
+      // 延迟保存历史记录，减少保存频率
+      if (value !== val) {
+        // 清除之前的定时器
+        if (saveHistoryTimeoutRef.current) {
+          clearTimeout(saveHistoryTimeoutRef.current);
+        }
+        
+        // 设置新的定时器，延迟1秒保存历史记录
+        saveHistoryTimeoutRef.current = setTimeout(() => {
+          const { past } = historyRef.current;
+          // 只保留最新的20次操作
+          const newPast = [...past, value];
+          const limitedPast = newPast.length > 20 ? newPast.slice(-20) : newPast;
+          
+          historyRef.current = {
+            past: limitedPast,
+            future: []
+          };
+          saveHistoryTimeoutRef.current = null;
+        }, 1000);
+      }
+      
       onChange(val)
       
       // 检查是否需要显示标签建议
@@ -143,7 +286,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         }
       }
     }
-  }, [onChange, tags])
+  }, [onChange, tags, value])
 
   // 标签选择状态
   const [showTagSelector, setShowTagSelector] = useState(false)
