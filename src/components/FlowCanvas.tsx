@@ -11,6 +11,8 @@ import {
   Edge,
   Node,
   NodeTypes,
+  NodeChange,
+  EdgeChange,
   useReactFlow,
   applyNodeChanges,
   applyEdgeChanges,
@@ -42,7 +44,7 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
 
   
   // 自定义节点变化处理，只在拖拽结束时保存历史记录
-  const onNodesChange = useCallback((changes) => {
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
     // 只在拖拽结束时保存历史记录
     const { past } = historyRef.current;
     if (changes.length > 0 && changes[0].type === 'position' && changes[0].dragging === false) {
@@ -59,7 +61,7 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
   }, [nodes, edges, setNodes]);
   
   // 自定义边变化处理，只在操作完成时保存历史记录
-  const onEdgesChange = useCallback((changes) => {
+  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
     // 只在边删除或操作完成时保存历史记录
     const { past } = historyRef.current;
     if (changes.length > 0 && (changes[0].type === 'remove')) {
@@ -75,23 +77,29 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
     setEdges((eds) => applyEdgeChanges(changes, eds));
   }, [nodes, edges, setEdges]);
   const reactFlowInstance = useReactFlow();
-  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  // FIX: 删除未使用的变量 reactFlowWrapper
   
   // 历史记录管理
   const historyRef = useRef<{past: {nodes: Node[], edges: Edge[]}[], future: {nodes: Node[], edges: Edge[]}[]}>({past: [], future: []});
   const selectedNodeId = useRef<string | null>(null);
+  const selectedEdgeId = useRef<string | null>(null);
 
   const bgColor = useColorModeValue('#fafafa', '#1a1a1a')
   const lineColor = useColorModeValue('#e2e8f0', '#2d3748')
   const miniMapBg = useColorModeValue('#ffffff', '#2d3748')
   const miniMapNodeColor = useColorModeValue('#e2e8f0', '#4a5568')
 
+  // 强制更新节点的回调函数
+  const handleNodeUpdate = useCallback(() => {
+    setNodes((nds) => [...nds]);
+  }, [setNodes]);
+
   // 定义节点类型
   const nodeTypes: NodeTypes = useMemo(
     () => ({
-      custom: (props: any) => <CustomNode {...props} tags={tags} />,
+      custom: (props: any) => <CustomNode {...props} tags={tags} onUpdate={handleNodeUpdate} />,
     }),
-    [tags]
+    [tags, handleNodeUpdate]
   )
 
   // 处理连接 - 允许手动连接
@@ -123,10 +131,21 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
     [onNodeSelect]
   )
 
+  // 处理连线点击
+  const onEdgeClick = useCallback(
+    (_event: React.MouseEvent, edge: Edge) => {
+      selectedEdgeId.current = edge.id;
+      selectedNodeId.current = null;
+      onNodeSelect(null);
+    },
+    [onNodeSelect]
+  )
+
   // 处理画布点击（取消选择）
   const onPaneClick = useCallback(() => {
     onNodeSelect(null);
     selectedNodeId.current = null;
+    selectedEdgeId.current = null;
   }, [onNodeSelect])
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -230,6 +249,25 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
     }
   }, [nodes, edges, setNodes, setEdges, onNodeSelect]);
 
+  // 删除选中的连线
+  const deleteSelectedEdge = useCallback(() => {
+    if (selectedEdgeId.current) {
+      // 保存当前状态到历史记录
+      const { past } = historyRef.current;
+      // 只保留最新的20次操作
+      const newPast = [...past, { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }];
+      const limitedPast = newPast.length > 20 ? newPast.slice(-20) : newPast;
+      
+      historyRef.current = {
+        past: limitedPast,
+        future: []
+      };
+      
+      setEdges((eds) => eds.filter((edge) => edge.id !== selectedEdgeId.current));
+      selectedEdgeId.current = null;
+    }
+  }, [nodes, edges, setEdges]);
+
   // 键盘事件处理
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -239,18 +277,38 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
         undo();
       }
       
-      // Delete 删除选中节点
-      if (event.key === 'Delete' && selectedNodeId.current) {
+      // Delete 删除选中节点或连线
+      if (event.key === 'Delete') {
         event.preventDefault();
-        deleteSelectedNode();
+        if (selectedNodeId.current) {
+          deleteSelectedNode();
+        } else if (selectedEdgeId.current) {
+          deleteSelectedEdge();
+        }
       }
+    };
+    
+    // 处理节点状态变化事件
+    const handleNodeProcessedChange = (event: Event) => {
+      // 强制重新渲染节点
+      setNodes((nds) => [...nds]);
+    };
+    
+    // 处理强制更新节点事件
+    const handleForceNodeUpdate = () => {
+      // 强制重新渲染所有节点
+      setNodes((nds) => [...nds]);
     };
 
     document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('nodeProcessedChange', handleNodeProcessedChange);
+    document.addEventListener('forceNodeUpdate', handleForceNodeUpdate);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('nodeProcessedChange', handleNodeProcessedChange);
+      document.removeEventListener('forceNodeUpdate', handleForceNodeUpdate);
     };
-  }, [undo, deleteSelectedNode]);
+  }, [undo, deleteSelectedNode, deleteSelectedEdge]);
 
   // 监听数据变化并通知父组件
   useEffect(() => {
@@ -267,6 +325,7 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       onNodeClick={onNodeClick}
+      onEdgeClick={onEdgeClick}
       onPaneClick={onPaneClick}
       nodeTypes={nodeTypes}
       onDrop={onDrop}

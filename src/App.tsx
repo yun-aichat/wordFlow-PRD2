@@ -81,9 +81,7 @@ function AppContent() {
 
   // 节点选择处理
   const handleNodeSelect = useCallback((node: CustomNode | null) => {
-    if (node && node.data.type === 'comment') {
-      return
-    }
+    // FIX: 允许所有类型的节点被选择，包括comment类型
     setSelectedNode(node)
   }, [])
 

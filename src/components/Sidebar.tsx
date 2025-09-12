@@ -32,7 +32,7 @@ import {
   FormControl,
   FormLabel,
 } from '@chakra-ui/react'
-import { Plus, MessageSquare, List, Tag, Map, ArrowLeft, Search, ListChevronsDownUp, ListChevronsUpDown, Edit, Container, GripVertical, Download } from 'lucide-react'
+import { Plus, MessageSquare, List, Tag, Map, ArrowLeft, ListChevronsDownUp, ListChevronsUpDown, Edit, GripVertical, Download, FileText } from 'lucide-react' // FIX: 删除未使用的Search和Container导入
 import { useReactFlow } from 'reactflow'
 import { v4 as uuidv4 } from 'uuid'
 import { CustomNode, Tag as TagType } from '../types'
@@ -118,6 +118,51 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
     onAddNodeClose()
   }
 
+  const addMarkdownFileNode = () => {
+    // 检查是否已存在markdown-file类型的节点
+    const allNodes = reactFlowInstance.getNodes() as CustomNode[]
+    const existingMarkdownNode = allNodes.find(node => node.data.type === 'markdown-file')
+    
+    if (existingMarkdownNode) {
+      toast({
+        title: '限制提醒',
+        description: '每个项目只能添加一个MD文件节点',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      })
+      return
+    }
+
+    const newNode: CustomNode = {
+      id: uuidv4(),
+      type: 'custom',
+      position: {
+        x: Math.random() * 400 + 100,
+        y: Math.random() * 400 + 100,
+      },
+      data: {
+        id: uuidv4(),
+        name: 'MD文件',
+        type: 'markdown-file' as any,
+        content: '',
+        description: '',
+        markdownFile: null,
+      },
+    }
+
+    reactFlowInstance.addNodes([newNode])
+    onAddNodeClose()
+    
+    toast({
+      title: 'MD文件节点已添加',
+      description: '请在右侧面板中上传MD文件',
+      status: 'success',
+      duration: 3000,
+      isClosable: true,
+    })
+  }
+
   const addComment = () => {
     const newComment: CustomNode = {
       id: uuidv4(),
@@ -140,6 +185,27 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
     }
 
     reactFlowInstance.addNodes([newComment])
+  }
+  
+  const addModification = () => {
+    const newModification: CustomNode = {
+      id: uuidv4(),
+      type: 'custom',
+      position: {
+        x: Math.random() * 400 + 100,
+        y: Math.random() * 400 + 100,
+      },
+      data: {
+        id: uuidv4(),
+        name: '批注',
+        type: 'modification' as any,
+        content: '在这里编写批注内容......',
+        description: '',
+        processed: false,
+      },
+    }
+
+    reactFlowInstance.addNodes([newModification])
   }
 
   const handleNodeClick = (nodeId: string) => {
@@ -472,6 +538,7 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
                       >
                         需求描述
                       </Button>
+
                     </VStack>
                   </PopoverBody>
                 </PopoverContent>
@@ -481,12 +548,38 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
               <Tooltip label="添加注释" placement="right">
                 <IconButton
                   aria-label="添加注释"
-                  icon={<MessageSquare size={16} />}
+                  icon={<FileText size={16} />}
                   size="sm"
                   variant="ghost"
                   color={iconColor}
                   _hover={{ bg: hoverBg, color: 'orange.500' }}
                   onClick={addComment}
+                />
+              </Tooltip>
+              
+              {/* 添加批注功能 */}
+              <Tooltip label="添加批注" placement="right">
+                <IconButton
+                  aria-label="添加批注"
+                  icon={<MessageSquare size={16} />}
+                  size="sm"
+                  variant="ghost"
+                  color={iconColor}
+                  _hover={{ bg: hoverBg, color: 'pink.500' }}
+                  onClick={addModification}
+                />
+              </Tooltip>
+              
+              {/* MD文件功能 */}
+              <Tooltip label="添加MD文件" placement="right">
+                <IconButton
+                  aria-label="添加MD文件"
+                  icon={<Text fontSize="16px">📄</Text>}
+                  size="sm"
+                  variant="ghost"
+                  color={iconColor}
+                  _hover={{ bg: hoverBg, color: 'teal.500' }}
+                  onClick={addMarkdownFileNode}
                 />
               </Tooltip>
               
@@ -605,7 +698,7 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
                 onClick={() => {
                   // 获取所有节点数据
                   const allNodes = reactFlowInstance.getNodes() as CustomNode[];
-                  const allEdges = reactFlowInstance.getEdges();
+                  // FIX: 删除未使用的allEdges变量
                   
                   // 创建HTML内容
                   let htmlContent = `<!DOCTYPE html>
@@ -704,8 +797,8 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
                 leftIcon={<Download size={16} />} 
                 colorScheme="teal"
                 onClick={() => {
-                  // 获取React Flow实例的视图
-                  const dataUrl = reactFlowInstance.toObject();
+                  // FIX: 删除未使用的dataUrl变量
+                  // const dataUrl = reactFlowInstance.toObject();
                   
                   toast({
                     title: '功能开发中',

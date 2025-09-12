@@ -1,8 +1,7 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import {
   Box,
   Text,
-  // Badge,
   useColorModeValue,
   VStack,
   HStack,
@@ -13,28 +12,45 @@ import {
 } from '@chakra-ui/react'
 import { Plus, X } from 'lucide-react'
 import { Handle, Position, NodeProps } from 'reactflow'
-import { NodeData } from '../types'
+import { CustomNode as CustomNodeType } from '../types'
 import TagInput from './TagInput'
 import TaggedText from './TaggedText'
+import MarkdownFileNode from './MarkdownFileNode'
 import { v4 as uuidv4 } from 'uuid'
 
 interface CustomNodeProps extends NodeProps {
-  data: NodeData
+  data: CustomNodeType['data']
   tags?: {name: string, color: string}[]
+  onUpdate?: () => void
 }
 
-const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) => {
+const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [], onUpdate }) => {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(data.name || '')
   const [editContent, setEditContent] = useState(data.content || '')
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [editingItemName, setEditingItemName] = useState('')
+  // 添加状态来跟踪节点的处理状态
+  const [isProcessed, setIsProcessed] = useState(data.processed || false)
 
   // 检查是否有任何编辑状态激活
   const hasActiveEditing = isEditing || editingItemId !== null
+  
+  // 同步React状态和节点数据
+  useEffect(() => {
+    // 当节点数据的processed状态变化时，更新React状态
+    if (data.processed !== isProcessed) {
+      setIsProcessed(data.processed || false);
+    }
+  }, [data.processed, isProcessed]);
+  
+  // 当React状态变化时，更新节点数据
+  useEffect(() => {
+    data.processed = isProcessed;
+  }, [isProcessed, data]);
 
   const handleDoubleClick = useCallback(() => {
-    if (data.type === 'comment') {
+    if (data.type === 'comment' || data.type === 'modification') {
       setIsEditing(true)
     }
   }, [data.type])
@@ -80,7 +96,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
       setEditingItemName('')
     }
   }, [handleItemSave])
-  // const bgColor = useColorModeValue('white', 'gray.700')
+
   const borderColor = useColorModeValue('gray.200', 'gray.600')
   const selectedBorderColor = useColorModeValue('blue.400', 'blue.300')
   const textColor = useColorModeValue('gray.800', 'white')
@@ -89,23 +105,29 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
   // 根据节点类型设置不同的颜色
   const pageNodeColor = useColorModeValue('blue.50', 'blue.700')
   const modalNodeColor = useColorModeValue('purple.50', 'purple.700')
-  const commentNodeColor = useColorModeValue('orange.50', 'orange.700')
+  const commentNodeColor = useColorModeValue('gray.100', 'gray.600') // 修改为不那么亮眼的颜色
   const defaultNodeColor = useColorModeValue('gray.100', 'gray.600')
   const overviewNodeColor = useColorModeValue('green.50', 'green.700')
   const requirementNodeColor = useColorModeValue('yellow.50', 'yellow.700')
+  const modificationNodeColor = useColorModeValue('pink.50', 'pink.700')
+  const markdownFileNodeColor = useColorModeValue('teal.50', 'teal.700')
 
   const pageBorderColor = useColorModeValue('blue.400', 'blue.300')
   const modalBorderColor = useColorModeValue('purple.400', 'purple.300')
-  const commentBorderColor = useColorModeValue('orange.400', 'orange.300')
+  const commentBorderColor = useColorModeValue('gray.300', 'gray.500') // 修改为不那么亮眼的颜色
   const overviewBorderColor = useColorModeValue('green.400', 'green.300')
   const requirementBorderColor = useColorModeValue('yellow.400', 'yellow.300')
+  const modificationBorderColor = useColorModeValue('pink.400', 'pink.300')
+  const markdownFileBorderColor = useColorModeValue('teal.400', 'teal.300')
   const defaultBorderColor = useColorModeValue('gray.300', 'gray.400')
 
   const pageIconColor = useColorModeValue('blue.600', 'blue.200')
   const modalIconColor = useColorModeValue('purple.600', 'purple.200')
-  const commentIconColor = useColorModeValue('orange.600', 'orange.200')
+  const commentIconColor = useColorModeValue('gray.600', 'gray.300') // 修改为不那么亮眼的颜色
   const overviewIconColor = useColorModeValue('green.600', 'green.200')
   const requirementIconColor = useColorModeValue('yellow.600', 'yellow.200')
+  const modificationIconColor = useColorModeValue('pink.600', 'pink.200')
+  const markdownFileIconColor = useColorModeValue('teal.600', 'teal.200')
   const defaultIconColor = useColorModeValue('gray.600', 'gray.300')
 
   // 列表项悬浮颜色
@@ -119,6 +141,9 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
       case 'comment': return commentNodeColor
       case 'overview': return overviewNodeColor
       case 'requirement': return requirementNodeColor
+      case 'modification': return modificationNodeColor
+      case 'markdown-file': return markdownFileNodeColor
+      case 'popup': return modalNodeColor // 处理popup类型
       default: return defaultNodeColor
     }
   }
@@ -130,6 +155,9 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
       case 'comment': return commentBorderColor
       case 'overview': return overviewBorderColor
       case 'requirement': return requirementBorderColor
+      case 'modification': return modificationBorderColor
+      case 'markdown-file': return markdownFileBorderColor
+      case 'popup': return modalBorderColor // 处理popup类型
       default: return defaultBorderColor
     }
   }
@@ -141,32 +169,46 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
       case 'comment': return commentIconColor
       case 'overview': return overviewIconColor
       case 'requirement': return requirementIconColor
+      case 'modification': return modificationIconColor
+      case 'markdown-file': return markdownFileIconColor
+      case 'popup': return modalIconColor // 处理popup类型
       default: return defaultIconColor
     }
   }
 
-  const getNodeIcon = (type: string) => {
+  const getNodeIcon = (type: CustomNodeType['data']['type']) => {
     switch (type) {
       case 'page': return '💻'
       case 'modal': return '📰'
       case 'comment': return '💡'
       case 'overview': return '🌍'
       case 'requirement': return '📝'
+      case 'modification': return '📌'
+      case 'markdown-file': return '📄'
+      case 'popup': return '📰' // 处理popup类型，使用与modal相同的图标
       default: return '💻'
     }
   }
 
-  // const getBadgeColor = (type: string) => {
-  //   switch (type) {
-  //     case 'page': return 'blue'
-  //     case 'modal': return 'purple'
-  //     case 'comment': return 'orange'
-  //     default: return 'gray'
-  //   }
-  // }
+
+
+  // MD文件节点的特殊渲染
+  if (data.type === 'markdown-file') {
+    return (
+      <MarkdownFileNode
+        data={data}
+        selected={selected}
+        nodeColor={getNodeColor()}
+        borderColor={selected ? selectedBorderColor : getBorderColor()}
+        iconColor={getIconColor()}
+        textColor={textColor}
+        onUpdate={onUpdate}
+      />
+    )
+  }
 
   // 备注节点的简约样式
-  if (data.type === 'comment') {
+  if (data.type === 'comment' || data.type === 'modification') {
     return (
       <Box
         bg={getNodeColor()}
@@ -177,67 +219,113 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
         minW="150px"
         maxW="250px"
         shadow="sm"
-        transition="all 0.2s ease-in-out"
         _hover={{
           shadow: 'md',
           transform: 'translateY(-1px)',
         }}
         onDoubleClick={handleDoubleClick}
-        cursor={isEditing ? 'default' : 'pointer'}
-        opacity={data.disabled ? 0.5 : 1}
-        filter={data.disabled ? 'grayscale(50%)' : 'none'}
+        // 允许点击事件冒泡，以便DELETE键可以删除节点
+        cursor="default"
+        opacity={data.disabled ? 0.5 : ((data.type === 'modification' || data.type === 'comment') && isProcessed ? 0.6 : 1)}
+        filter={data.disabled ? 'grayscale(50%)' : ((data.type === 'modification' || data.type === 'comment') && isProcessed ? 'grayscale(30%)' : 'none')}
+        transition="all 0.2s ease-in-out, opacity 0.3s ease, filter 0.3s ease"
         className={hasActiveEditing ? 'nodrag' : ''}
       >
-        <VStack spacing={2} align="start">
-          <HStack spacing={2}>
-            <Text fontSize="xs" color={getIconColor()}>{getNodeIcon(data.type)}</Text>
-            {isEditing ? (
-              <TagInput
-                 value={editName}
-                 onChange={setEditName}
-                 tags={tags}
-                 size="sm"
-                 placeholder="输入内容，键入 { 来引用标签"
-                 onBlur={handleSave}
-                 onKeyDown={handleKeyDown}
-                 // className="nodrag"
-               />
-            ) : (
-              <TaggedText 
-                 text={data.name || '备注'} 
-                 fontSize="xs" 
-                 fontWeight="bold" 
-                 color={textColor} 
-                 flex={1}
-                 tags={tags}
-               />
+        <VStack spacing={2} align="start" width="100%">
+          <HStack spacing={2} width="100%" justifyContent="space-between">
+            <HStack spacing={2}>
+              <Text fontSize="xs" color={getIconColor()}>{getNodeIcon(data.type)}</Text>
+              {isEditing ? (
+                <TagInput
+                   value={editName}
+                   onChange={setEditName}
+                   tags={tags}
+                   size="sm"
+                   placeholder="输入内容，键入 { 来引用标签"
+                   onBlur={handleSave}
+                   onKeyDown={handleKeyDown}
+                 />
+              ) : (
+                <TaggedText 
+                   text={data.name || (data.type === 'modification' ? '批注' : '备注')} 
+                   fontSize="xs" 
+                   fontWeight="bold" 
+                   color={textColor} 
+                   flex={1}
+                   tags={tags}
+                 />
+              )}
+            </HStack>
+            
+            {/* 修改节点的处理状态开关 */}
+            {data.type === 'modification' && (
+              <Box 
+                as="span" 
+                bg={isProcessed ? 'green.100' : 'red.100'}
+                color={isProcessed ? 'green.700' : 'red.700'}
+                fontSize="xs"
+                px={2}
+                py={0.5}
+                borderRadius="full"
+                fontWeight="medium"
+                cursor="pointer"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    // 更新React状态
+                    setIsProcessed(!isProcessed);
+                    // 同时更新节点数据
+                    data.processed = !data.processed;
+                    // 触发自定义事件通知状态变化
+                    const event = new CustomEvent('nodeProcessedChange', { detail: { nodeId: data.id, processed: data.processed } });
+                    document.dispatchEvent(event);
+                  }}
+                _hover={{
+                  bg: isProcessed ? 'green.200' : 'red.200',
+                }}
+                transition="all 0.2s"
+              >
+                <Box 
+                  as="span" 
+                  w="8px" 
+                  h="8px" 
+                  borderRadius="full" 
+                  bg={isProcessed ? 'green.500' : 'red.500'} 
+                  mr="1"
+                />
+                {isProcessed ? '已处理' : '待处理'}
+              </Box>
             )}
           </HStack>
           
           {isEditing ? (
             <Textarea
               value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditContent(e.target.value)}
               onBlur={handleSave}
               onKeyDown={handleKeyDown}
-              onMouseDown={(e) => e.stopPropagation()}
-              onMouseMove={(e) => e.stopPropagation()}
+              onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+              onMouseMove={(e: React.MouseEvent) => e.stopPropagation()}
               fontSize="xs"
               color={subtextColor}
               size="sm"
               variant="unstyled"
-              placeholder="备注内容"
+              placeholder={data.type === 'modification' ? '批注内容' : '备注内容'}
               resize="none"
               rows={3}
               className="nodrag"
+              width="100%"
             />
           ) : (
             <TaggedText 
-               text={data.content || data.description || '在这里编写备注内容......'} 
+               text={data.content || data.description || (data.type === 'modification' ? '在这里编写批注内容......' : '在这里编写备注内容......')} 
                fontSize="xs" 
                color={subtextColor} 
                noOfLines={4}
                tags={tags}
+               width="100%"
              />
           )}
         </VStack>
@@ -256,7 +344,6 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
       minW="200px"
       maxW="250px"
       shadow={selected ? 'xl' : 'sm'}
-      transition="all 0.2s ease-in-out"
       _hover={{
         shadow: 'lg',
         transform: 'translateY(-2px)',
@@ -264,8 +351,9 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
       }}
       position="relative"
       role="group"
-      opacity={data.disabled ? 0.5 : 1}
-      filter={data.disabled ? 'grayscale(50%)' : 'none'}
+      opacity={data.disabled ? 0.5 : ((data.type === 'modification' || data.type === 'comment') && isProcessed ? 0.6 : 1)}
+      filter={data.disabled ? 'grayscale(50%)' : ((data.type === 'modification' || data.type === 'comment') && isProcessed ? 'grayscale(30%)' : 'none')}
+      transition="all 0.2s ease-in-out, opacity 0.3s ease, filter 0.3s ease"
       className={hasActiveEditing ? 'nodrag' : ''}
     >
       {/* 标题区域的左侧接入柄 */}
@@ -298,7 +386,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
                 cursor="pointer"
                 _hover={{ opacity: 0.8 }}
                 transition="opacity 0.2s"
-                onClick={(e) => {
+                onClick={(e: React.MouseEvent) => {
                   e.stopPropagation()
                   // 触发图片展开事件
                   const event = new CustomEvent('openImageModal', { detail: { image: data.image } })
@@ -353,11 +441,11 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [] }) =>
                    {editingItemId === item.id ? (
                      <Input
                        value={editingItemName}
-                       onChange={(e) => setEditingItemName(e.target.value)}
+                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingItemName(e.target.value)}
                        onKeyDown={handleItemKeyDown}
                        onBlur={handleItemSave}
-                       onMouseDown={(e) => e.stopPropagation()}
-                       onMouseMove={(e) => e.stopPropagation()}
+                       onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                       onMouseMove={(e: React.MouseEvent) => e.stopPropagation()}
                        fontSize="sm"
                        size="sm"
                        autoFocus

@@ -68,8 +68,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   const mdEditorRef = useRef<any>(null)
   const toast = useToast()
   
-  // const bgColor = useColorModeValue('white', 'gray.800')
-  // const borderColor = useColorModeValue('gray.200', 'gray.600')
+  // FIX: 删除未使用的颜色变量
   const suggestionBg = useColorModeValue('white', 'gray.700')
   const suggestionBorder = useColorModeValue('gray.200', 'gray.600')
 
