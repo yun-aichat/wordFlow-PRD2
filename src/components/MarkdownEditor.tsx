@@ -101,21 +101,18 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     }
 
     console.log('粘贴项数量:', items.length);
-    let hasImage = false;
     
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      console.log('粘贴项类型:', item.type);
+    // 检查是否粘贴了文本（可能是图片链接）
+    const pastedText = event.clipboardData?.getData('text');
+    if (pastedText && (pastedText.startsWith('http://') || pastedText.startsWith('https://'))) {
+      // 检查是否为图片链接
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+      const isImageUrl = imageExtensions.some(ext => pastedText.toLowerCase().includes(ext)) || 
+                        pastedText.includes('image') || 
+                        pastedText.includes('img') ||
+                        pastedText.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i);
       
-      if (item.type.startsWith('image/')) {
-        hasImage = true;
-        const file = item.getAsFile();
-        if (!file) {
-          console.log('无法获取文件');
-          continue;
-        }
-        
-        console.log('获取到图片文件:', file.name, file.size);
+      if (isImageUrl) {
         event.preventDefault();
         
         const textarea = document.querySelector('.w-md-editor-text-input') as HTMLTextAreaElement;
@@ -124,75 +121,24 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
           return;
         }
         
-        // 显示临时占位符
-        const placeholderText = '![上传中...]()'; 
+        // 插入图片链接的Markdown格式
+        const markdownImage = `![](${pastedText})`;
         const selectionStart = textarea.selectionStart;
         const selectionEnd = textarea.selectionEnd;
         const newValue =
           value.substring(0, selectionStart) +
-          placeholderText +
+          markdownImage +
           value.substring(selectionEnd);
         onChange(newValue);
         
-        // 上传图片到后端
-        try {
-          const formData = new FormData();
-          formData.append('image', file);
-          console.log('准备上传图片');
-          
-          const response = await fetch('/upload', {
-            method: 'POST',
-            body: formData,
-          });
-          
-          console.log('上传响应状态:', response.status);
-          if (!response.ok) {
-            throw new Error('Image upload failed');
-          }
-          
-          const data = await response.json();
-          console.log('上传响应数据:', data);
-          const imageUrl = data.imageUrl;
-          const isDuplicate = data.isDuplicate;
-          
-          // 替换占位符为实际图片链接
-          const markdownImage = `![](${imageUrl})`;
-          
-          // 如果是重复图片，不显示提示信息（根据需求1）
-          
-          const currentValue = textarea.value;
-          const placeholderIndex = currentValue.indexOf('![上传中...]()'); 
-          
-          console.log('占位符索引:', placeholderIndex);
-          if (placeholderIndex !== -1) {
-            const updatedValue =
-              currentValue.substring(0, placeholderIndex) +
-              markdownImage +
-              currentValue.substring(placeholderIndex + '![上传中...]()'.length);
-            onChange(updatedValue);
-            console.log('已替换占位符为图片链接');
-            
-            // 移动光标到插入图片后的位置
-            const newCursorPos = placeholderIndex + markdownImage.length;
-            setTimeout(() => {
-              textarea.setSelectionRange(newCursorPos, newCursorPos);
-              textarea.focus();
-            }, 0);
-          }
-        } catch (error) {
-          console.error('上传图片失败:', error);
-          // 上传失败，移除占位符
-          const currentValue = textarea.value;
-          const placeholderIndex = currentValue.indexOf('![上传中...]()'); 
-          
-          if (placeholderIndex !== -1) {
-            const updatedValue =
-              currentValue.substring(0, placeholderIndex) +
-              currentValue.substring(placeholderIndex + '![上传中...]()'.length);
-            onChange(updatedValue);
-            console.log('已移除占位符');
-          }
-        }
+        console.log('已插入图片链接:', pastedText);
+        
+        // 移动光标到插入图片后的位置
+        const newCursorPos = selectionStart + markdownImage.length;
+        setTimeout(() => {
+          textarea.setSelectionRange(newCursorPos, newCursorPos);
+          textarea.focus();
+        }, 0);
       }
     }
   }, [value, onChange]);

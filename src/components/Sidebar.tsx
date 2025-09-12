@@ -32,7 +32,7 @@ import {
   FormControl,
   FormLabel,
 } from '@chakra-ui/react'
-import { Plus, MessageSquare, List, Tag, Map, ArrowLeft, ListChevronsDownUp, ListChevronsUpDown, Edit, GripVertical, Download, FileText } from 'lucide-react' // FIX: 删除未使用的Search和Container导入
+import { Plus, MessageSquare, List, Tag, Map, ArrowLeft, ListChevronsDownUp, ListChevronsUpDown, Edit, GripVertical, Download, CircleFadingArrowUp, FileText } from 'lucide-react' // FIX: 删除未使用的Search和Container导入
 import { useReactFlow } from 'reactflow'
 import { v4 as uuidv4 } from 'uuid'
 import { CustomNode, Tag as TagType } from '../types'
@@ -574,7 +574,7 @@ const Sidebar: React.FC<SidebarProps> = ({ tags, onTagsChange, showMiniMap = tru
               <Tooltip label="添加MD文件" placement="right">
                 <IconButton
                   aria-label="添加MD文件"
-                  icon={<Text fontSize="16px">📄</Text>}
+                  icon={<CircleFadingArrowUp size={16} />}
                   size="sm"
                   variant="ghost"
                   color={iconColor}

@@ -49,12 +49,12 @@ import {
 } from '@chakra-ui/react'
 // FIX: 修复图标导入，添加缺失的图标
 import { CloseIcon, CopyIcon, ViewIcon, ViewOffIcon, DownloadIcon, AttachmentIcon, DeleteIcon } from '@chakra-ui/icons'
-import { Upload, X, Maximize2, FileText, Trash2, Paperclip, Image as ImageIcon, MapPin } from 'lucide-react'
+import { X, FileText, Trash2, Paperclip, Image as ImageIcon, MapPin, Upload } from 'lucide-react'
 import MDEditor from '@uiw/react-md-editor'
 import { useReactFlow } from 'reactflow'
 import { CustomNode, NodeFormData } from '../types'
 // import TagInput from './TagInput'
-import MarkdownEditor from './MarkdownEditor'
+
 
 interface NodeSettingsPanelProps {
   selectedNode: CustomNode | null
@@ -75,15 +75,13 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
     description: '',
   })
   // FIX: 删除未使用的变量
-  const [isExpanded] = useState(false)
-  const [isFullscreenModalOpen, setIsFullscreenModalOpen] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isImageModalOpen, setIsImageModalOpen] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   // FIX: 删除未使用的tabIndex变量
   const [files, setFiles] = useState<{ name: string; url: string; size?: number; type?: string }[]>([])
   const [mdFileContent, setMdFileContent] = useState<string | null>(null)
   const [activeTabIndex, setActiveTabIndex] = useState(0)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const attachmentInputRef = useRef<HTMLInputElement>(null) // FIX: 恢复attachmentInputRef，因为代码中有使用
   const autoSaveTimeoutRef = useRef<number | null>(null)
   const mdContentBoxRef = useRef<HTMLDivElement>(null)
@@ -102,8 +100,38 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
       })
       setSelectedImage(selectedNode.data.image || null)
       setFiles(selectedNode.data.files || [])
+      
+      // 从本地存储加载MD文件内容
+      const fileKey = `md_file_${selectedNode.id}`
+      const storedFile = localStorage.getItem(fileKey)
+      if (storedFile && !selectedNode.data.markdownFile) {
+        try {
+          const fileData = JSON.parse(storedFile)
+          const updatedNode: CustomNode = {
+            ...selectedNode,
+            data: {
+              ...selectedNode.data,
+              markdownFile: {
+                name: fileData.name,
+                content: fileData.content,
+                size: fileData.size
+              }
+            }
+          }
+          
+          // 更新节点数据
+          reactFlowInstance.setNodes((nodes) =>
+            nodes.map((node) =>
+              node.id === selectedNode.id ? updatedNode : node
+            )
+          )
+          onNodeUpdate(updatedNode)
+        } catch (error) {
+          console.error('Failed to load file from localStorage:', error)
+        }
+      }
     }
-  }, [selectedNode])
+  }, [selectedNode, reactFlowInstance, onNodeUpdate])
 
   // 监听来自CustomNode的图片展开事件
   useEffect(() => {
@@ -223,7 +251,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
    // 当切换到PRD查看页面时自动定位（仅首次进入时执行一次）
    const firstTabChangeRef = useRef(true);
    useEffect(() => {
-     if (activeTabIndex === 2 && formData.name && mdFileContent && firstTabChangeRef.current) { // PRD查看是第3个tab (index=2)
+     if (activeTabIndex === 1 && formData.name && mdFileContent && firstTabChangeRef.current) { // PRD查看是第2个tab (index=1)
        // 延迟执行定位，确保页面已渲染
        const timer = setTimeout(() => {
          handleLocateInMD(formData.name)
@@ -284,62 +312,46 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
     }))
   }
 
-  const handleImageFile = async (file: File) => {
-    const formData = new FormData();
-    formData.append('image', file);
 
-    try {
-      const response = await fetch('/upload', {
-        method: 'POST',
-        body: formData,
-      });
 
-      if (!response.ok) {
-        throw new Error('Image upload failed');
+  const handleImagePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pastedText = e.clipboardData?.getData('text');
+    if (pastedText && (pastedText.startsWith('http://') || pastedText.startsWith('https://'))) {
+      // 检查是否为图片链接
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+      const isImageUrl = imageExtensions.some(ext => pastedText.toLowerCase().includes(ext)) || 
+                        pastedText.includes('image') || 
+                        pastedText.includes('img');
+      
+      if (isImageUrl || pastedText.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i)) {
+        setSelectedImage(pastedText);
+        toast({
+          title: '图片链接已添加',
+          status: 'success',
+          duration: 2000,
+          isClosable: true,
+        });
+      } else {
+        toast({
+          title: '请粘贴有效的图片链接',
+          description: '支持 jpg、png、gif、webp、svg 等格式',
+          status: 'warning',
+          duration: 3000,
+          isClosable: true,
+        });
       }
-
-      const data = await response.json();
-      setSelectedImage(data.imageUrl);
+    } else {
       toast({
-        title: '图片上传成功',
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      toast({
-        title: '图片上传失败',
-        description: '请检查后端服务是否正常运行。',
-        status: 'error',
+        title: '请粘贴图片链接',
+        description: '只支持 http:// 或 https:// 开头的图片链接',
+        status: 'info',
         duration: 3000,
         isClosable: true,
       });
     }
   };
 
-  const handleImagePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    const items = e.clipboardData?.items;
-    if (items) {
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.type.indexOf('image') !== -1) {
-          const file = item.getAsFile();
-          if (file) {
-            handleImageFile(file);
-          }
-          break;
-        }
-      }
-    }
-  };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      handleImageFile(file);
-    }
-  };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -609,6 +621,42 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                         >
                           替换
                         </Button>
+                        <Button
+                          size="xs"
+                          colorScheme="red"
+                          onClick={() => {
+                            const updatedNode: CustomNode = {
+                              ...selectedNode,
+                              data: {
+                                ...selectedNode.data,
+                                markdownFile: undefined
+                              }
+                            }
+                            
+                            // 更新节点
+                            reactFlowInstance.setNodes((nodes) =>
+                              nodes.map((node) =>
+                                node.id === selectedNode.id ? updatedNode : node
+                              )
+                            )
+                            onNodeUpdate(updatedNode)
+                            
+                            // 从本地存储删除文件
+                            const fileKey = `md_file_${selectedNode.id}`
+                            localStorage.removeItem(fileKey)
+                            
+                            toast({
+                              title: 'MD文件已删除',
+                              description: '文件已从本地存储中移除',
+                              status: 'success',
+                              duration: 2000,
+                              isClosable: true,
+                            })
+                          }}
+                        >
+                          删除
+                        </Button>
+
                       </HStack>
                     </HStack>
                     
@@ -642,7 +690,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                     borderRadius="md"
                     bg={useColorModeValue('gray.50', 'gray.700')}
                   >
-                    <Upload size={48} opacity={0.5} />
+                    <FileText size={48} opacity={0.5} />
                     <VStack spacing={2}>
                       <Text fontSize="sm" color="gray.500">
                         点击上传MD文件
@@ -665,55 +713,68 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                   style={{ display: 'none' }}
                   onChange={(e) => {
                     const file = e.target.files?.[0]
-                     if (file) {
-                       // 检查文件类型
-                       if (!file.name.toLowerCase().endsWith('.md')) {
-                         toast({
-                           title: '文件类型错误',
-                           description: '请选择 .md 格式的文件',
-                           status: 'error',
-                           duration: 3000,
-                           isClosable: true,
-                         })
-                         return
-                       }
-                       
-                       const reader = new FileReader()
-                       reader.onload = (event) => {
-                         const content = event.target?.result as string
-                         // 获取不带扩展名的文件名作为节点名称
-                         const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "")
-                         
-                         const updatedNode: CustomNode = {
-                           ...selectedNode,
-                           data: {
-                             ...selectedNode.data,
-                             name: fileNameWithoutExt, // 自动设置节点名称为文件名
-                             markdownFile: {
-                               name: file.name,
-                               content: content,
-                               size: file.size
-                             }
-                           }
-                         }
-                         reactFlowInstance.setNodes((nodes) =>
-                           nodes.map((node) =>
-                             node.id === selectedNode.id ? updatedNode : node
-                           )
-                         )
-                         onNodeUpdate(updatedNode)
-                         toast({
-                           title: 'MD文件上传成功',
-                           description: `文件 ${file.name} 已加载`,
-                           status: 'success',
-                           duration: 2000,
-                           isClosable: true,
-                         })
-                       }
-                       reader.readAsText(file)
-                     }
+                    if (file) {
+                      // 检查文件类型
+                      if (!file.name.toLowerCase().endsWith('.md') && !file.name.toLowerCase().endsWith('.markdown')) {
+                        toast({
+                          title: '文件类型错误',
+                          description: '请选择 .md 或 .markdown 格式的文件',
+                          status: 'error',
+                          duration: 3000,
+                          isClosable: true,
+                        })
+                        return
+                      }
+                      
+                      const reader = new FileReader()
+                      reader.onload = (event) => {
+                        const content = event.target?.result as string
+                        // 获取不带扩展名的文件名作为节点名称
+                        const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "")
+                        
+                        const updatedNode: CustomNode = {
+                          ...selectedNode,
+                          data: {
+                            ...selectedNode.data,
+                            name: fileNameWithoutExt, // 自动设置节点名称为文件名
+                            markdownFile: {
+                              name: file.name,
+                              content: content,
+                              size: file.size
+                            }
+                          }
+                        }
+                        
+                        // 更新节点
+                        reactFlowInstance.setNodes((nodes) =>
+                          nodes.map((node) =>
+                            node.id === selectedNode.id ? updatedNode : node
+                          )
+                        )
+                        onNodeUpdate(updatedNode)
+                        
+                        // 将文件内容保存到本地存储
+                        const fileKey = `md_file_${selectedNode.id}`
+                        localStorage.setItem(fileKey, JSON.stringify({
+                          name: file.name,
+                          content: content,
+                          size: file.size,
+                          lastModified: Date.now()
+                        }))
+                        
+                        toast({
+                          title: 'MD文件上传成功',
+                          description: `文件 ${file.name} 已保存到本地存储`,
+                          status: 'success',
+                          duration: 2000,
+                          isClosable: true,
+                        })
+                      }
+                      reader.readAsText(file)
+                    }
                   }}
                 />
+
               </Box>
             </FormControl>
           </VStack>
@@ -780,7 +841,6 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
           <Tabs size="sm" variant="enclosed" index={activeTabIndex} onChange={setActiveTabIndex}>
             <TabList>
                 <Tab>基本信息</Tab>
-                <Tab>内容详情</Tab>
                 <Tab>PRD查看</Tab>
                 <Tab>附件</Tab>
               </TabList>
@@ -884,30 +944,13 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                            />
                         </Box>
                       )}
-                      <HStack>
-                        <Input
-                          size="sm"
-                          value="" // FIX: 修复受控组件警告，添加空字符串value
-                          placeholder="粘贴图片或点击右侧按钮上传"
-                          onPaste={handleImagePaste}
-                          readOnly // FIX: 设置为只读，因为只用于粘贴功能
-                          flex={1}
-                        />
-                        <IconButton
-                          aria-label="上传图片"
-                          icon={<Upload size={14} />}
-                          size="sm"
-                          variant="outline"
-                          onClick={() => fileInputRef.current?.click()}
-                        />
-                      </HStack>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        onChange={handleImageUpload}
-                      />
+                      <Input
+                         size="sm"
+                         placeholder="粘贴图片链接 (http:// 或 https://)"
+                         onPaste={handleImagePaste}
+                         flex={1}
+                       />
+
                     </VStack>
                   </FormControl>
 
@@ -926,33 +969,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                 </VStack>
               </TabPanel>
 
-              <TabPanel px={0} py={3}>
-                <VStack spacing={3} align="stretch">
-                  <FormControl size="sm">
-                    <HStack justify="space-between" align="center" mb={2}>
-                      <FormLabel fontSize="sm" mb={0}>PRD内容</FormLabel>
-                      <HStack spacing={1}>
-                        <IconButton
-                          aria-label="全屏预览"
-                          icon={<Maximize2 size={14} />}
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => setIsFullscreenModalOpen(true)}
-                        />
-                      </HStack>
-                    </HStack>
-                    
-                    <Box height={isExpanded ? "500px" : "300px"}>
-                      <MarkdownEditor
-                        value={formData.content || ''} // FIX: 修复受控组件警告，确保value始终为字符串
-                        onChange={(value) => handleInputChange('content', value)}
-                        placeholder="支持 Markdown 格式和标签引用 {标签名}。输入 { 可触发标签自动补全"
-                        tags={tags}
-                      />
-                    </Box>
-                  </FormControl>
-                </VStack>
-              </TabPanel>
+
               
               {/* PRD查看面板 */}
               <TabPanel px={0} py={3}>
@@ -1130,58 +1147,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
         </ModalContent>
       </Modal>
       
-      {/* PRD内容全屏预览Modal */}
-      <Modal isOpen={isFullscreenModalOpen} onClose={() => setIsFullscreenModalOpen(false)} size="full">
-        <ModalOverlay bg="rgba(0, 0, 0, 0.8)" />
-        <ModalContent bg={bgColor} m={4} borderRadius="lg">
-          <Box p={6} h="100%" display="flex" flexDirection="column">
-            {/* 头部 */}
-            <HStack justify="space-between" align="center" mb={4}>
-              <Text fontSize="xl" fontWeight="bold">
-                PRD内容 - {selectedNode?.data.name || '未命名节点'}
-              </Text>
-              <HStack spacing={2}>
-                <Button
-                  size="sm"
-                  leftIcon={<CopyIcon />}
-                  variant="outline"
-                  onClick={() => {
-                    navigator.clipboard.writeText(formData.content || '')
-                    toast({
-                      title: '复制成功',
-                      description: 'PRD内容已复制到剪贴板',
-                      status: 'success',
-                      duration: 2000,
-                      isClosable: true,
-                    })
-                  }}
-                >
-                  复制内容
-                </Button>
-                <IconButton
-                  aria-label="关闭"
-                  icon={<CloseIcon />}
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setIsFullscreenModalOpen(false)}
-                />
-              </HStack>
-            </HStack>
-            
-            {/* 内容区域 */}
-            <Box flex={1}>
-              {/* FIX: 删除不存在的enableImagePaste属性 */}
-              <MarkdownEditor
-                value={formData.content || ''}
-                onChange={(value) => handleInputChange('content', value)}
-                placeholder="支持 Markdown 格式和标签引用 {标签名}。输入 { 可触发标签自动补全"
-                tags={tags}
-                height={window.innerHeight - 200}
-              />
-            </Box>
-          </Box>
-        </ModalContent>
-      </Modal>
+
     </>
   )
 }

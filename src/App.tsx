@@ -81,7 +81,11 @@ function AppContent() {
 
   // 节点选择处理
   const handleNodeSelect = useCallback((node: CustomNode | null) => {
-    // FIX: 允许所有类型的节点被选择，包括comment类型
+    // 备注和注释节点只能选中，不能展开详情页
+    if (node && (node.data.type === 'comment' || node.data.type === 'modification')) {
+      setSelectedNode(null)
+      return
+    }
     setSelectedNode(node)
   }, [])
 
