@@ -30,26 +30,20 @@ import {
   MenuButton,
   MenuList,
   MenuItem,
-  Switch,
-  Badge,
-  Divider,
-  Flex,
-  Spacer,
-  Spinner,
-  Alert,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
-  useDisclosure,
-  ModalHeader,
-  ModalFooter,
-  ModalCloseButton,
-  Tooltip,
-  Link
+  // Switch,
+  // Badge,
+  // Divider,
+  // Flex,
+  // Spacer,
+  // Spinner,
+  // Alert,
+  // AlertIcon,
+  // AlertTitle,
+  // AlertDescription,
 } from '@chakra-ui/react'
 // FIX: 修复图标导入，添加缺失的图标
-import { CloseIcon, CopyIcon, ViewIcon, ViewOffIcon, DownloadIcon, AttachmentIcon, DeleteIcon } from '@chakra-ui/icons'
-import { X, FileText, Trash2, Paperclip, Image as ImageIcon, MapPin, Upload } from 'lucide-react'
+import { CloseIcon, ViewIcon, ViewOffIcon, DownloadIcon, AttachmentIcon } from '@chakra-ui/icons'
+import { X, FileText, Trash2, Paperclip, MapPin } from 'lucide-react'
 import MDEditor from '@uiw/react-md-editor'
 import { useReactFlow } from 'reactflow'
 import { CustomNode, NodeFormData } from '../types'
@@ -67,7 +61,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
   selectedNode,
   onNodeUpdate,
   onClose,
-  tags,
+  tags: _tags,
 }) => {
   const [formData, setFormData] = useState<NodeFormData>({
     name: '',
@@ -75,8 +69,8 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
     description: '',
   })
   // FIX: 删除未使用的变量
+
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   // FIX: 删除未使用的tabIndex变量
   const [files, setFiles] = useState<{ name: string; url: string; size?: number; type?: string }[]>([])
@@ -89,6 +83,9 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
   const toast = useToast()
   const bgColor = useColorModeValue('white', 'gray.800')
   const borderColor = useColorModeValue('gray.200', 'gray.600')
+  const mdEditorTextColor = useColorModeValue('black', 'white')
+  const fileItemBgColor = useColorModeValue('gray.50', 'gray.700')
+  const tabPanelBgColor = useColorModeValue('gray.50', 'gray.700')
 
   // 当选中节点变化时，更新表单数据
   useEffect(() => {
@@ -112,10 +109,10 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
             data: {
               ...selectedNode.data,
               markdownFile: {
-                name: fileData.name,
-                content: fileData.content,
-                size: fileData.size
-              }
+              name: fileData.name,
+              content: fileData.content,
+              size: fileData.size
+            }
             }
           }
           
@@ -133,19 +130,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
     }
   }, [selectedNode, reactFlowInstance, onNodeUpdate])
 
-  // 监听来自CustomNode的图片展开事件
-  useEffect(() => {
-    const handleOpenImageModal = (event: CustomEvent) => {
-      const { image } = event.detail
-      setSelectedImage(image)
-      setIsImageModalOpen(true)
-    }
 
-    window.addEventListener('openImageModal', handleOpenImageModal as EventListener)
-    return () => {
-      window.removeEventListener('openImageModal', handleOpenImageModal as EventListener)
-    }
-  }, [])
 
   // 获取项目中的MD文件内容
   useEffect(() => {
@@ -161,24 +146,24 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
 
   // 监听节点变化，实时更新MD文件内容
   useEffect(() => {
-    const handleNodesChange = () => {
-      const allNodes = reactFlowInstance.getNodes() as CustomNode[]
-      const markdownNode = allNodes.find(node => node.data.type === 'markdown-file')
-      
-      if (markdownNode && markdownNode.data.markdownFile?.content) {
-        setMdFileContent(markdownNode.data.markdownFile.content)
-      } else {
-        setMdFileContent(null)
-      }
-    }
+    // const handleNodesChange = () => {
+    //   const allNodes = reactFlowInstance.getNodes() as CustomNode[]
+    //   const markdownNode = allNodes.find(node => node.data.type === 'markdown-file')
+    //   
+    //   if (markdownNode && markdownNode.data.markdownFile?.content) {
+    //     setMdFileContent(markdownNode.data.markdownFile.content)
+    //   } else {
+    //     setMdFileContent(null)
+    //   }
+    // }
 
     // 监听节点变化事件
-    const unsubscribe = reactFlowInstance.onNodesChange?.(handleNodesChange)
+    // const unsubscribe = reactFlowInstance?.onNodesChange?.(handleNodesChange)
     
     return () => {
-      if (typeof unsubscribe === 'function') {
-        unsubscribe()
-      }
+      // if (typeof unsubscribe === 'function') {
+      //   unsubscribe()
+      // }
     }
   }, [reactFlowInstance])
 
@@ -594,25 +579,40 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
               >
                 {selectedNode.data.markdownFile ? (
                   <VStack spacing={3} align="stretch" h="100%">
-                    <HStack justify="space-between">
-                      <Text fontSize="sm" fontWeight="medium">
+                    <VStack spacing={2} align="stretch">
+                      <Text fontSize="sm" fontWeight="medium" noOfLines={2}>
                         {selectedNode.data.markdownFile.name}
                       </Text>
-                      <HStack>
+                      <HStack justify="flex-start">
                         <Button
                           size="xs"
                           leftIcon={<DownloadIcon />}
                           onClick={() => {
-                            const blob = new Blob([selectedNode.data.markdownFile.content], { type: 'text/markdown' })
+                            const blob = new Blob([selectedNode.data.markdownFile?.content || ''], { type: 'text/markdown' })
                             const url = URL.createObjectURL(blob)
                             const a = document.createElement('a')
                             a.href = url
-                            a.download = selectedNode.data.markdownFile.name
+                            a.download = selectedNode.data.markdownFile?.name || 'document.md'
                             a.click()
                             URL.revokeObjectURL(url)
                           }}
                         >
                           下载
+                        </Button>
+                        <Button
+                          size="xs"
+                          colorScheme="green"
+                          onClick={() => {
+                            // 触发放大展示事件
+                            window.dispatchEvent(new CustomEvent('openMdModal', {
+                              detail: {
+                                name: selectedNode.data.markdownFile?.name || 'document.md',
+                                content: selectedNode.data.markdownFile?.content || ''
+                              }
+                            }))
+                          }}
+                        >
+                          放大
                         </Button>
                         <Button
                           size="xs"
@@ -656,9 +656,8 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                         >
                           删除
                         </Button>
-
                       </HStack>
-                    </HStack>
+                    </VStack>
                     
                     {/* MD文件预览 */}
                     <Box
@@ -673,7 +672,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                         onChange={() => {}} // 只读模式
                         preview="preview"
                         hideToolbar
-                        visibleDragBar={false}
+                        visibleDragbar={false}
                         data-color-mode={useColorModeValue('light', 'dark')}
                       />
                     </Box>
@@ -738,10 +737,10 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                             ...selectedNode.data,
                             name: fileNameWithoutExt, // 自动设置节点名称为文件名
                             markdownFile: {
-                              name: file.name,
-                              content: content,
-                              size: file.size
-                            }
+                           name: file.name,
+                           content: content,
+                           size: file.size
+                         }
                           }
                         }
                         
@@ -860,7 +859,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                             selectedNode.data.type === 'modal' ? '📰' :
                             selectedNode.data.type === 'overview' ? '🌍' :
                             selectedNode.data.type === 'requirement' ? '📝' :
-                            selectedNode.data.type === 'markdown-file' ? '📄' : '💡'
+                            (selectedNode.data.type as any) === 'markdown-file' ? '📄' : '💡'
                           }</Text>}
                           size="sm"
                           variant="ghost"
@@ -922,7 +921,19 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                               borderRadius="md"
                               objectFit="cover"
                               cursor="pointer"
-                              onClick={() => setIsImageModalOpen(true)}
+                              crossOrigin="anonymous"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                console.warn('图片加载失败:', selectedImage)
+                                const target = e.target as HTMLImageElement
+                                target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjRjdGQUZDIiBzdHJva2U9IiNFMkU4RjAiIHN0cm9rZS13aWR0aD0iMiIvPgo8cGF0aCBkPSJNMzAgNzBMMjAgNjBMMzUgNDVMNTAgNjBMNjUgNDVMODAgNjBMNzAgNzBIMzBaIiBmaWxsPSIjQ0JENUUwIi8+CjxjaXJjbGUgY3g9IjM1IiBjeT0iMzUiIHI9IjUiIGZpbGw9IiNBMEFEQjgiLz4KPHRleHQgeD0iNTAiIHk9Ijg1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjEwIiBmaWxsPSIjNjg3Mjg4Ij7lm77niYfliqDovb3lpLHotKU8L3RleHQ+Cjwvc3ZnPgo='
+                                target.alt = '图片加载失败'
+                                target.style.opacity = '0.6'
+                              }}
+                              onClick={() => {
+                                const event = new CustomEvent('openImageModal', { detail: { image: selectedImage } })
+                                window.dispatchEvent(event)
+                              }}
                             />
                           </AspectRatio>
                           <IconButton
@@ -1003,16 +1014,16 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                       borderWidth="1px" 
                       borderRadius="md" 
                       p={3}
-                      maxH="400px"
+                      maxH="600px"
                       overflowY="auto"
-                      bg={useColorModeValue('gray.50', 'gray.700')}
+                      bg={tabPanelBgColor}
                     >
                       {mdFileContent ? (
                         <MDEditor.Markdown 
                           source={mdFileContent} 
                           style={{ 
                             backgroundColor: 'transparent',
-                            color: useColorModeValue('black', 'white')
+                            color: mdEditorTextColor
                           }}
                         />
                       ) : (
@@ -1035,7 +1046,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                         <Box borderWidth="1px" borderRadius="md" p={2}>
                           <VStack spacing={2} align="stretch">
                             {files.map((file, index) => (
-                              <HStack key={index} justify="space-between" p={2} borderRadius="md" bg={useColorModeValue('gray.50', 'gray.700')}>
+                              <HStack key={index} justify="space-between" p={2} borderRadius="md" bg={fileItemBgColor}>
                                 <HStack spacing={2}>
                                   <FileText size={16} />
                                   <Text fontSize="sm" noOfLines={1} maxW="150px">
@@ -1075,7 +1086,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
                           borderStyle="dashed" 
                           p={4} 
                           textAlign="center"
-                          bg={useColorModeValue('gray.50', 'gray.700')}
+                          bg={tabPanelBgColor}
                         >
                           <VStack spacing={2}>
                             <Paperclip size={24} opacity={0.5} />
@@ -1118,36 +1129,6 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
         </Box>
       </Card>
       
-      {/* 图片展开查看Modal */}
-      <Modal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} size="full">
-        <ModalOverlay bg="rgba(0, 0, 0, 0.8)" />
-        <ModalContent bg="transparent" boxShadow="none">
-          <ModalBody p={0} display="flex" alignItems="center" justifyContent="center" position="relative">
-            <Image
-              src={selectedImage || ''}
-              alt="展开图片"
-              maxH="90vh"
-              maxW="90vw"
-              objectFit="contain"
-            />
-            <IconButton
-              aria-label="关闭图片预览"
-              icon={<X size={20} />}
-              position="absolute"
-              top={4}
-              right={4}
-              bg="rgba(0, 0, 0, 0.5)"
-              color="white"
-              variant="solid"
-              borderRadius="full"
-              _hover={{ bg: "rgba(0, 0, 0, 0.7)" }}
-              onClick={() => setIsImageModalOpen(false)}
-            />
-          </ModalBody>
-        </ModalContent>
-      </Modal>
-      
-
     </>
   )
 }

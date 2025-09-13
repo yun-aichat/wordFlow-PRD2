@@ -10,11 +10,20 @@ import {
   ChakraProvider,
   useToast,
   Spinner,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalBody,
+  ModalHeader,
+  ModalCloseButton,
+  Image,
 } from '@chakra-ui/react'
 import { keyframes } from '@emotion/react'
 import { MoonIcon, SunIcon } from '@chakra-ui/icons'
+import { X } from 'lucide-react'
 import { ReactFlowProvider } from 'reactflow'
 import 'reactflow/dist/style.css'
+import MDEditor from '@uiw/react-md-editor'
 
 import Sidebar from './components/Sidebar'
 import FlowCanvas from './components/FlowCanvas'
@@ -40,6 +49,10 @@ function AppContent() {
   const [nodes, setNodes] = useState<CustomNode[]>([])
   const [edges, setEdges] = useState<any[]>([])
   const [isSaving, setIsSaving] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false)
+  const [selectedMdFile, setSelectedMdFile] = useState<{name: string, content: string} | null>(null)
+  const [isMdModalOpen, setIsMdModalOpen] = useState(false)
   const toast = useToast()
   
   // 预先调用所有useColorModeValue hooks
@@ -63,6 +76,34 @@ function AppContent() {
     }
   }, [])
 
+  // 监听来自CustomNode的图片展开事件
+  useEffect(() => {
+    const handleOpenImageModal = (event: CustomEvent) => {
+      const { image } = event.detail
+      setSelectedImage(image)
+      setIsImageModalOpen(true)
+    }
+
+    window.addEventListener('openImageModal', handleOpenImageModal as EventListener)
+    return () => {
+      window.removeEventListener('openImageModal', handleOpenImageModal as EventListener)
+    }
+  }, [])
+
+  // 监听来自NodeSettingsPanel的MD文件展开事件
+  useEffect(() => {
+    const handleOpenMdModal = (event: CustomEvent) => {
+      const { name, content } = event.detail
+      setSelectedMdFile({ name, content })
+      setIsMdModalOpen(true)
+    }
+
+    window.addEventListener('openMdModal', handleOpenMdModal as EventListener)
+    return () => {
+      window.removeEventListener('openMdModal', handleOpenMdModal as EventListener)
+    }
+  }, [])
+
   // 选择项目
   const handleProjectSelect = useCallback((project: Project) => {
     setCurrentProject(project)
@@ -81,11 +122,7 @@ function AppContent() {
 
   // 节点选择处理
   const handleNodeSelect = useCallback((node: CustomNode | null) => {
-    // 备注和注释节点只能选中，不能展开详情页
-    if (node && (node.data.type === 'comment' || node.data.type === 'modification')) {
-      setSelectedNode(null)
-      return
-    }
+    // 所有节点都可以打开设置面板
     setSelectedNode(node)
   }, [])
 
@@ -262,6 +299,69 @@ function AppContent() {
               tags={tags}
             />
           )}
+
+          {/* 图片放大查看模态框 */}
+          <Modal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} size="6xl" isCentered>
+            <ModalOverlay />
+            <ModalContent bg="transparent" boxShadow="none" display="flex" alignItems="center" justifyContent="center">
+              <ModalBody p={0} position="relative" display="flex" alignItems="center" justifyContent="center">
+                <IconButton
+                  aria-label="关闭"
+                  icon={<X size={20} />}
+                  position="absolute"
+                  top={4}
+                  right={4}
+                  zIndex={1}
+                  colorScheme="whiteAlpha"
+                  variant="solid"
+                  onClick={() => setIsImageModalOpen(false)}
+                />
+                {selectedImage && (
+                  <Image
+                    src={selectedImage}
+                    alt="放大查看"
+                    maxH="90vh"
+                    maxW="90vw"
+                    objectFit="contain"
+                    borderRadius="md"
+                    crossOrigin="anonymous"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      console.warn('图片预览加载失败:', selectedImage)
+                      const target = e.target as HTMLImageElement
+                      target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjdGQUZDIiBzdHJva2U9IiNFMkU4RjAiIHN0cm9rZS13aWR0aD0iMiIvPgo8dGV4dCB4PSIyMDAiIHk9IjE1MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzlDQTNBRiIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE2Ij7lm77niYfliqDovb3lpLHotKU8L3RleHQ+Cjx0ZXh0IHg9IjIwMCIgeT0iMTgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOUNBM0FGIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiPuWPr+iDveWtmOWcqOi3qOWfn+mZkOWItuaIluWbvueJh+acjeWKoeWZqOmXrumimDwvdGV4dD4KPC9zdmc+'
+                      target.alt = '图片加载失败 - 可能存在跨域限制'
+                      target.style.opacity = '0.7'
+                    }}
+                  />
+                )}
+              </ModalBody>
+            </ModalContent>
+          </Modal>
+
+          {/* MD文件放大展示模态框 */}
+          <Modal isOpen={isMdModalOpen} onClose={() => setIsMdModalOpen(false)} size="6xl" isCentered>
+            <ModalOverlay />
+            <ModalContent maxH="90vh">
+              <ModalHeader>
+                {selectedMdFile?.name || 'MD文件预览'}
+              </ModalHeader>
+              <ModalCloseButton />
+              <ModalBody pb={6} overflow="auto">
+                {selectedMdFile && (
+                  <MDEditor
+                    value={selectedMdFile.content}
+                    onChange={() => {}} // 只读模式
+                    preview="preview"
+                    hideToolbar
+                    visibleDragbar={false}
+                    data-color-mode={useColorModeValue('light', 'dark')}
+                    height={600}
+                  />
+                )}
+              </ModalBody>
+            </ModalContent>
+          </Modal>
         </Box>
       </ReactFlowProvider>
   )

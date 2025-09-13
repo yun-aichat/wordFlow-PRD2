@@ -98,7 +98,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [], onUp
   }, [handleItemSave])
 
   const borderColor = useColorModeValue('gray.200', 'gray.600')
-  const selectedBorderColor = useColorModeValue('blue.400', 'blue.300')
+  const selectedBorderColor = useColorModeValue('orange.400', 'orange.300')
   const textColor = useColorModeValue('gray.800', 'white')
   const subtextColor = useColorModeValue('gray.600', 'gray.300')
 
@@ -198,10 +198,6 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [], onUp
       <MarkdownFileNode
         data={data}
         selected={selected}
-        nodeColor={getNodeColor()}
-        borderColor={selected ? selectedBorderColor : getBorderColor()}
-        iconColor={getIconColor()}
-        textColor={textColor}
         onUpdate={onUpdate}
       />
     )
@@ -351,8 +347,8 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [], onUp
       }}
       position="relative"
       role="group"
-      opacity={data.disabled ? 0.5 : ((data.type === 'modification' || data.type === 'comment') && isProcessed ? 0.6 : 1)}
-      filter={data.disabled ? 'grayscale(50%)' : ((data.type === 'modification' || data.type === 'comment') && isProcessed ? 'grayscale(30%)' : 'none')}
+      opacity={data.disabled ? 0.5 : (((data.type as any) === 'modification' || (data.type as any) === 'comment') && isProcessed ? 0.6 : 1)}
+      filter={data.disabled ? 'grayscale(50%)' : (((data.type as any) === 'modification' || (data.type as any) === 'comment') && isProcessed ? 'grayscale(30%)' : 'none')}
       transition="all 0.2s ease-in-out, opacity 0.3s ease, filter 0.3s ease"
       className={hasActiveEditing ? 'nodrag' : ''}
     >
@@ -386,8 +382,20 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [], onUp
                 cursor="pointer"
                 _hover={{ opacity: 0.8 }}
                 transition="opacity 0.2s"
+                crossOrigin="anonymous"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  console.warn('图片加载失败:', data.image)
+                  const target = e.target as HTMLImageElement
+                  target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjRjdGQUZDIiBzdHJva2U9IiNFMkU4RjAiIHN0cm9rZS13aWR0aD0iMiIvPgo8cGF0aCBkPSJNMzAgNzBMMjAgNjBMMzUgNDVMNTAgNjBMNjUgNDVMODAgNjBMNzAgNzBIMzBaIiBmaWxsPSIjQ0JENUUwIi8+CjxjaXJjbGUgY3g9IjM1IiBjeT0iMzUiIHI9IjUiIGZpbGw9IiNBMEFEQjgiLz4KPHRleHQgeD0iNTAiIHk9Ijg1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjEwIiBmaWxsPSIjNjg3Mjg4Ij7lm77niYfliqDovb3lpLHotKU8L3RleHQ+Cjwvc3ZnPgo='
+                  target.alt = '图片加载失败'
+                  target.style.opacity = '0.6'
+                }}
+                onLoad={() => {
+                  console.log('图片加载成功:', data.image)
+                }}
                 onClick={(e: React.MouseEvent) => {
-                  e.stopPropagation()
+                  // 不阻止事件冒泡，让节点选择正常工作
                   // 触发图片展开事件
                   const event = new CustomEvent('openImageModal', { detail: { image: data.image } })
                   window.dispatchEvent(event)

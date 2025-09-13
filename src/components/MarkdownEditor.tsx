@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import MDEditor, { commands } from '@uiw/react-md-editor'
-import { Box, useColorModeValue, Portal, VStack, Text, Button, Badge, Tooltip, useToast } from '@chakra-ui/react'
+import { Box, useColorModeValue, Portal, VStack, Text, Button, Badge, Tooltip } from '@chakra-ui/react'
 import { Tag as TagIcon } from 'lucide-react' // 导入 Tag 图标
 import { Tag } from '../types'
 import { remarkTagHighlight, getTagSuggestions } from '../utils/remarkTagPlugin'
@@ -52,7 +52,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   onChange,
   tags,
   placeholder = '开始编写内容...',
-  height = 400,
+  height = 600,
 }) => {
   // 移除预览模式状态，只保留编辑模式
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -66,9 +66,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   }>({ past: [], future: [] });
   const [selectedSuggestion, setSelectedSuggestion] = useState(0)
   const mdEditorRef = useRef<any>(null)
-  const toast = useToast()
+  // const toast = useToast()
   
-  // FIX: 删除未使用的颜色变量
   const suggestionBg = useColorModeValue('white', 'gray.700')
   const suggestionBorder = useColorModeValue('gray.200', 'gray.600')
 
@@ -105,12 +104,17 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     // 检查是否粘贴了文本（可能是图片链接）
     const pastedText = event.clipboardData?.getData('text');
     if (pastedText && (pastedText.startsWith('http://') || pastedText.startsWith('https://'))) {
-      // 检查是否为图片链接
-      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
-      const isImageUrl = imageExtensions.some(ext => pastedText.toLowerCase().includes(ext)) || 
-                        pastedText.includes('image') || 
-                        pastedText.includes('img') ||
-                        pastedText.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i);
+      // 改进的图片URL检测逻辑
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.tiff', '.ico'];
+      const isImageUrl = 
+        // 直接包含图片扩展名
+        imageExtensions.some(ext => pastedText.toLowerCase().includes(ext)) ||
+        // 包含图片相关关键词
+        /\b(image|img|photo|picture|pic)\b/i.test(pastedText) ||
+        // 匹配图片扩展名（包括查询参数）
+        /\.(jpg|jpeg|png|gif|webp|svg|bmp|tiff|ico)(\?.*)?$/i.test(pastedText) ||
+        // 常见图片托管服务域名
+        /\b(imgur\.com|i\.imgur\.com|cdn\.|images\.|img\.|static\.|assets\.)/.test(pastedText);
       
       if (isImageUrl) {
         event.preventDefault();
@@ -121,24 +125,59 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
           return;
         }
         
-        // 插入图片链接的Markdown格式
-        const markdownImage = `![](${pastedText})`;
-        const selectionStart = textarea.selectionStart;
-        const selectionEnd = textarea.selectionEnd;
-        const newValue =
-          value.substring(0, selectionStart) +
-          markdownImage +
-          value.substring(selectionEnd);
-        onChange(newValue);
+        // 验证图片链接是否可访问
+        const img = new Image();
+        img.crossOrigin = 'anonymous'; // 尝试解决CORS问题
         
-        console.log('已插入图片链接:', pastedText);
+        img.onload = () => {
+          console.log('图片加载成功:', pastedText);
+          // 插入图片链接的Markdown格式
+          const markdownImage = `![图片](${pastedText})`;
+          const selectionStart = textarea.selectionStart;
+          const selectionEnd = textarea.selectionEnd;
+          const newValue =
+            value.substring(0, selectionStart) +
+            markdownImage +
+            value.substring(selectionEnd);
+          onChange(newValue);
+          
+          // 移动光标到插入图片后的位置
+          const newCursorPos = selectionStart + markdownImage.length;
+          setTimeout(() => {
+            textarea.setSelectionRange(newCursorPos, newCursorPos);
+            textarea.focus();
+          }, 0);
+        };
         
-        // 移动光标到插入图片后的位置
-        const newCursorPos = selectionStart + markdownImage.length;
+        img.onerror = () => {
+          console.warn('图片加载失败，可能存在CORS限制或链接无效:', pastedText);
+          // 即使加载失败也插入链接，但添加提示
+          const markdownImage = `![图片加载失败 - 可能存在跨域限制](${pastedText})`;
+          const selectionStart = textarea.selectionStart;
+          const selectionEnd = textarea.selectionEnd;
+          const newValue =
+            value.substring(0, selectionStart) +
+            markdownImage +
+            value.substring(selectionEnd);
+          onChange(newValue);
+          
+          // 移动光标到插入图片后的位置
+          const newCursorPos = selectionStart + markdownImage.length;
+          setTimeout(() => {
+            textarea.setSelectionRange(newCursorPos, newCursorPos);
+            textarea.focus();
+          }, 0);
+        };
+        
+        // 设置超时，避免长时间等待
         setTimeout(() => {
-          textarea.setSelectionRange(newCursorPos, newCursorPos);
-          textarea.focus();
-        }, 0);
+          if (!img.complete) {
+            img.src = ''; // 取消加载
+            console.warn('图片加载超时:', pastedText);
+          }
+        }, 5000);
+        
+        img.src = pastedText;
       }
     }
   }, [value, onChange]);
@@ -293,7 +332,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   }, [])
 
   const customPreviewComponents = useMemo(() => ({
-    p: ({ children }: { children: React.ReactNode }) => {
+    p: ({ children }: any) => {
         const processChildren = (nodes: React.ReactNode): React.ReactNode => {
             if (!nodes) return null;
 

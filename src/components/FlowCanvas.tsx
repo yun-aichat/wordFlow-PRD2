@@ -40,6 +40,7 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
 }) => {
   const [nodes, setNodes] = useNodesState(initialNodes)
   const [edges, setEdges] = useEdgesState(initialEdges)
+  const reactFlowInstance = useReactFlow()
   
 
   
@@ -76,13 +77,14 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
     }
     setEdges((eds) => applyEdgeChanges(changes, eds));
   }, [nodes, edges, setEdges]);
-  const reactFlowInstance = useReactFlow();
+  // const reactFlowInstance = useReactFlow();
   // FIX: 删除未使用的变量 reactFlowWrapper
   
   // 历史记录管理
   const historyRef = useRef<{past: {nodes: Node[], edges: Edge[]}[], future: {nodes: Node[], edges: Edge[]}[]}>({past: [], future: []});
-  const selectedNodeId = useRef<string | null>(null);
-  const selectedEdgeId = useRef<string | null>(null);
+  const selectedNodeId = useRef<string | null>(null)
+  const selectedEdgeId = useRef<string | null>(null)
+  const copiedNode = useRef<CustomNodeType | null>(null);
 
   const bgColor = useColorModeValue('#fafafa', '#1a1a1a')
   const lineColor = useColorModeValue('#e2e8f0', '#2d3748')
@@ -125,8 +127,15 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
   // 处理节点选择
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
-      onNodeSelect(node as CustomNodeType);
-      selectedNodeId.current = node.id;
+      const customNode = node as CustomNodeType;
+      // 批注和备注节点点击时不打开设置面板，只选中以便删除
+      if (customNode.data.type === 'comment' || customNode.data.type === 'modification') {
+        selectedNodeId.current = node.id;
+        onNodeSelect(null); // 不打开设置面板
+      } else {
+        onNodeSelect(customNode);
+        selectedNodeId.current = node.id;
+      }
     },
     [onNodeSelect]
   )
@@ -196,17 +205,17 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
   );
 
   // 保存当前状态到历史记录
-  const saveToHistory = useCallback(() => {
-    const { past } = historyRef.current;
-    // 只保留最新的20次操作
-    const newPast = [...past, { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }];
-    const limitedPast = newPast.length > 20 ? newPast.slice(-20) : newPast;
-    
-    historyRef.current = {
-      past: limitedPast,
-      future: []
-    };
-  }, [nodes, edges]);
+  // const saveToHistory = useCallback(() => {
+  //   const { past } = historyRef.current;
+  //   // 只保留最新的20次操作
+  //   const newPast = [...past, { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }];
+  //   const limitedPast = newPast.length > 20 ? newPast.slice(-20) : newPast;
+  //   
+  //   historyRef.current = {
+  //     past: limitedPast,
+  //     future: []
+  //   };
+  // }, [nodes, edges]);
 
   // 撤销操作
   const undo = useCallback(() => {
@@ -277,6 +286,44 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
         undo();
       }
       
+      // Ctrl+C 复制节点
+      if (event.ctrlKey && event.key === 'c' && selectedNodeId.current) {
+        event.preventDefault();
+        const selectedNode = nodes.find(node => node.id === selectedNodeId.current) as CustomNodeType;
+        if (selectedNode && selectedNode.data.type !== 'markdown-file') {
+          // MD文件节点不可复制以保证唯一性
+          copiedNode.current = selectedNode;
+        }
+      }
+      
+      // Ctrl+V 粘贴节点
+      if (event.ctrlKey && event.key === 'v' && copiedNode.current) {
+        event.preventDefault();
+        
+        // 保存当前状态到历史记录
+        const { past } = historyRef.current;
+        const newPast = [...past, { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }];
+        const limitedPast = newPast.length > 20 ? newPast.slice(-20) : newPast;
+        
+        historyRef.current = {
+          past: limitedPast,
+          future: []
+        };
+        
+        // 创建新节点，位置稍微偏移
+        const newNodeId = `${copiedNode.current.id}_copy_${Date.now()}`;
+        const newNode: CustomNodeType = {
+          ...copiedNode.current,
+          id: newNodeId,
+          position: {
+            x: copiedNode.current.position.x + 50,
+            y: copiedNode.current.position.y + 50,
+          },
+        };
+        
+        setNodes((nds) => [...nds, newNode]);
+      }
+      
       // Delete 删除选中节点或连线
       if (event.key === 'Delete') {
         event.preventDefault();
@@ -289,7 +336,7 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
     };
     
     // 处理节点状态变化事件
-    const handleNodeProcessedChange = (event: Event) => {
+    const handleNodeProcessedChange = (_event: Event) => {
       // 强制重新渲染节点
       setNodes((nds) => [...nds]);
     };
@@ -308,7 +355,7 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
       document.removeEventListener('nodeProcessedChange', handleNodeProcessedChange);
       document.removeEventListener('forceNodeUpdate', handleForceNodeUpdate);
     };
-  }, [undo, deleteSelectedNode, deleteSelectedEdge]);
+  }, [undo, deleteSelectedNode, deleteSelectedEdge, nodes, edges, setNodes]);
 
   // 监听数据变化并通知父组件
   useEffect(() => {
@@ -332,6 +379,9 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
       onDragOver={onDragOver}
       fitView
       attributionPosition="bottom-left"
+      multiSelectionKeyCode={null}
+      selectionKeyCode={null}
+      deleteKeyCode={null}
       style={{
         backgroundColor: bgColor,
       }}

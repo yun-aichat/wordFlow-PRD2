@@ -33,15 +33,15 @@ import {
   Grid,
   GridItem
 } from '@chakra-ui/react'
-import { AddIcon, EditIcon, DeleteIcon, DownloadIcon, AttachmentIcon } from '@chakra-ui/icons'
+import { AddIcon, EditIcon, DeleteIcon, AttachmentIcon, DownloadIcon } from '@chakra-ui/icons'
 import { Project } from '../types'
 import {
   getAllProjects,
   createProject,
   saveProject,
   deleteProject,
-  exportProject,
   importProject,
+  exportProject,
   generateThumbnail
 } from '../services/localStorage'
 
@@ -165,34 +165,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ onProjectSelect }) => {
     }
   }
 
-  // 导出项目
-  const handleExportProject = (project: Project) => {
-    try {
-      const data = exportProject(project.id)
-      const blob = new Blob([data], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${project.name}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-      
-      toast({
-        title: '项目导出成功',
-        status: 'success',
-        duration: 2000
-      })
-    } catch (error) {
-      toast({
-        title: '导出失败',
-        description: (error as Error).message,
-        status: 'error',
-        duration: 3000
-      })
-    }
-  }
+
 
   // 导入项目
   const handleImportProject = () => {
@@ -227,6 +200,36 @@ const ProjectList: React.FC<ProjectListProps> = ({ onProjectSelect }) => {
       }
     }
     input.click()
+  }
+
+  // 导出项目
+  const handleExportProject = (project: Project) => {
+    try {
+      const jsonData = exportProject(project.id)
+      const blob = new Blob([jsonData], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${project.name}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+      toast({
+        title: '项目导出成功',
+        description: `项目 "${project.name}" 已导出为JSON文件`,
+        status: 'success',
+        duration: 2000
+      })
+    } catch (error) {
+      toast({
+        title: '导出失败',
+        description: (error as Error).message,
+        status: 'error',
+        duration: 3000
+      })
+    }
   }
 
   return (
@@ -289,6 +292,17 @@ const ProjectList: React.FC<ProjectListProps> = ({ onProjectSelect }) => {
                       </VStack>
                       <HStack spacing={1}>
                         <IconButton
+                          aria-label="导出项目"
+                          icon={<DownloadIcon />}
+                          size="sm"
+                          variant="ghost"
+                          colorScheme="green"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleExportProject(project)
+                          }}
+                        />
+                        <IconButton
                           aria-label="编辑项目"
                           icon={<EditIcon />}
                           size="sm"
@@ -296,16 +310,6 @@ const ProjectList: React.FC<ProjectListProps> = ({ onProjectSelect }) => {
                           onClick={(e) => {
                             e.stopPropagation()
                             handleEditProject(project)
-                          }}
-                        />
-                        <IconButton
-                          aria-label="导出项目"
-                          icon={<DownloadIcon />}
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleExportProject(project)
                           }}
                         />
                         <IconButton

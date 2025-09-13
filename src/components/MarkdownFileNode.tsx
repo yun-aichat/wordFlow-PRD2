@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react'
+import React, { useState, useCallback } from 'react'
 import {
   Box,
   Text,
@@ -6,7 +6,7 @@ import {
   VStack,
   HStack,
   IconButton,
-  Input,
+  // Input,
   useToast,
   Modal,
   ModalOverlay,
@@ -17,7 +17,7 @@ import {
   Button,
   Flex,
 } from '@chakra-ui/react'
-import { Download, Eye, FileText, X } from 'lucide-react'
+import { Download, Eye, FileText } from 'lucide-react'
 import MDEditor from '@uiw/react-md-editor'
 import { CustomNode } from '../types'
 
@@ -29,7 +29,7 @@ interface MarkdownFileNodeProps {
 
 const MarkdownFileNode: React.FC<MarkdownFileNodeProps> = ({ 
   data, 
-  selected = false, 
+  selected: _selected = false, 
   onUpdate 
 }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
@@ -37,7 +37,7 @@ const MarkdownFileNode: React.FC<MarkdownFileNodeProps> = ({
   const toast = useToast()
 
   const borderColor = useColorModeValue('gray.200', 'gray.600')
-  const selectedBorderColor = useColorModeValue('blue.400', 'blue.300')
+  const selectedBorderColor = useColorModeValue('orange.400', 'orange.300')
   const textColor = useColorModeValue('gray.800', 'white')
   const subtextColor = useColorModeValue('gray.600', 'gray.300')
   const bgColor = useColorModeValue('orange.50', 'orange.700')
@@ -49,14 +49,15 @@ const MarkdownFileNode: React.FC<MarkdownFileNodeProps> = ({
   const handleFileDownload = useCallback(() => {
     if (!data.markdownFile) return
 
+    const blob = new Blob([markdownContent], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
     const element = document.createElement('a')
-    const file = new Blob([markdownContent], { type: 'text/markdown' })
-    element.href = URL.createObjectURL(file)
+    element.href = url
     element.download = data.markdownFile.name
     document.body.appendChild(element)
     element.click()
     document.body.removeChild(element)
-    URL.revokeObjectURL(element.href)
+    URL.revokeObjectURL(url)
 
     toast({
       title: '下载完成',
@@ -67,24 +68,7 @@ const MarkdownFileNode: React.FC<MarkdownFileNodeProps> = ({
     })
   }, [data.markdownFile, markdownContent, toast])
 
-  // 处理文件删除
-  const handleFileDelete = useCallback(() => {
-    const updatedData = {
-      ...data,
-      markdownFile: undefined,
-    }
-    
-    setMarkdownContent('')
-    onUpdate?.(updatedData)
 
-    toast({
-      title: '文件已删除',
-      description: 'MD文件已从节点中移除',
-      status: 'info',
-      duration: 2000,
-      isClosable: true,
-    })
-  }, [data, onUpdate, toast])
 
   // 打开预览
   const handlePreview = useCallback(() => {
@@ -99,16 +83,16 @@ const MarkdownFileNode: React.FC<MarkdownFileNodeProps> = ({
       <Box
         bg={bgColor}
         border="2px"
-        borderColor={selected ? selectedBorderColor : borderColor}
+        borderColor={_selected ? selectedBorderColor : borderColor}
         borderRadius="lg"
         p={4}
         minW="200px"
         maxW="250px"
-        shadow={selected ? 'xl' : 'sm'}
+        shadow={_selected ? 'xl' : 'sm'}
         _hover={{
           shadow: 'lg',
           transform: 'translateY(-2px)',
-          borderColor: selected ? selectedBorderColor : borderColor,
+          borderColor: _selected ? selectedBorderColor : borderColor,
         }}
         transition="all 0.2s ease-in-out"
       >
@@ -162,14 +146,6 @@ const MarkdownFileNode: React.FC<MarkdownFileNodeProps> = ({
                     variant="ghost"
                     colorScheme="green"
                     onClick={handleFileDownload}
-                  />
-                  <IconButton
-                    aria-label="删除文件"
-                    icon={<X size={14} />}
-                    size="xs"
-                    variant="ghost"
-                    colorScheme="red"
-                    onClick={handleFileDelete}
                   />
                 </HStack>
               </HStack>
