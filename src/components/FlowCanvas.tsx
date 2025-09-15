@@ -11,6 +11,7 @@ import {
   Edge,
   Node,
   NodeTypes,
+  EdgeTypes,
   NodeChange,
   EdgeChange,
   useReactFlow,
@@ -19,6 +20,7 @@ import {
 } from 'reactflow'
 import { useColorModeValue } from '@chakra-ui/react'
 import CustomNode from './CustomNode'
+import CustomEdge from './CustomEdge'
 import { CustomNode as CustomNodeType } from '../types'
 
 interface FlowCanvasProps {
@@ -102,6 +104,14 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
       custom: (props: any) => <CustomNode {...props} tags={tags} onUpdate={handleNodeUpdate} />,
     }),
     [tags, handleNodeUpdate]
+  )
+  
+  // 定义边类型
+  const edgeTypes: EdgeTypes = useMemo(
+    () => ({
+      default: CustomEdge,
+    }),
+    []
   )
 
   // 处理连接 - 允许手动连接
@@ -377,6 +387,7 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
       nodeTypes={nodeTypes}
       onDrop={onDrop}
       onDragOver={onDragOver}
+      edgeTypes={edgeTypes}
       fitView
       attributionPosition="bottom-left"
       multiSelectionKeyCode={null}

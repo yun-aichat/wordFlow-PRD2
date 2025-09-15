@@ -1,0 +1,34 @@
+directories:
+  output: release
+  buildResources: electron/resources
+appId: com.devbuddy.wordflow
+productName: WordFlow PRD Editor
+copyright: Copyright © 2024 DevBuddy
+files:
+  - filter:
+      - dist/**/*
+      - electron/**/*
+extraResources:
+  - from: public
+    to: public
+win:
+  icon: electron/icons/icon.svg
+  target:
+    - nsis
+mac:
+  icon: electron/icons/icon.svg
+  category: public.app-category.productivity
+  target:
+    - dmg
+linux:
+  icon: electron/icons
+  category: Office
+  target:
+    - AppImage
+    - deb
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+electronVersion: 29.4.6

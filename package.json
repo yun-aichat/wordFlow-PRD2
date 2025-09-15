@@ -1,15 +1,19 @@
 {
-  "name": "nodeflow-prd-editor",
+  "name": "wordflow-prd-editor",
   "version": "1.0.0",
-  "description": "基于 React Flow 和 Chakra UI 的 NodeFlowPRD 编辑器",
-  "main": "index.js",
+  "description": "基于 React Flow 和 Chakra UI 的 WordFlow PRD 编辑器",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently \"npm:dev:frontend\" \"npm:dev:backend\"",
     "dev:frontend": "vite",
     "dev:backend": "ts-node --project tsconfig.server.json server.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext js,jsx,ts,tsx"
+    "lint": "eslint . --ext js,jsx,ts,tsx",
+    "electron:dev": "concurrently \"cross-env BROWSER=none npm run dev:frontend\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
+    "electron:build": "npm run build && electron-builder build --config electron-builder.json",
+    "electron:pack": "npm run build && electron-builder build --dir --config electron-builder.json",
+    "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
     "@chakra-ui/icons": "^2.1.1",
@@ -46,6 +50,9 @@
     "@vitejs/plugin-react": "^4.1.1",
     "concurrently": "^9.2.1",
     "cors": "^2.8.5",
+    "cross-env": "^7.0.3",
+    "electron": "^29.1.0",
+    "electron-builder": "^24.13.3",
     "eslint": "^8.53.0",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
@@ -54,7 +61,8 @@
     "multer": "^2.0.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.2.2",
-    "vite": "^4.5.0"
+    "vite": "^4.5.0",
+    "wait-on": "^7.2.0"
   },
   "keywords": [
     "react",

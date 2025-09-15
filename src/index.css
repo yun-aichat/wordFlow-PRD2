@@ -32,3 +32,13 @@ html, body, #root {
 .react-flow__handle.valid {
   background: #55dd99;
 }
+
+/* 自定义边样式 */
+.edge-label-container {
+  pointer-events: all;
+}
+
+/* 扩大边的点击区域 */
+.react-flow__edge-path-selector {
+  cursor: pointer;
+}
