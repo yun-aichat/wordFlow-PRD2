@@ -30,7 +30,8 @@ interface MarkdownFileNodeProps {
 const MarkdownFileNode: React.FC<MarkdownFileNodeProps> = ({ 
   data, 
   selected: _selected = false, 
-  onUpdate 
+  // FIX: 删除未使用的参数onUpdate
+  // onUpdate 
 }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [markdownContent, setMarkdownContent] = useState(data.markdownFile?.content || '')

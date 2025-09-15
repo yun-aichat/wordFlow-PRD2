@@ -6,7 +6,8 @@ interface CustomEdgeData {
   label?: string;
 }
 
-const CustomEdge: React.FC<EdgeProps> = ({
+// FIX: 添加泛型参数，确保data属性类型正确
+const CustomEdge: React.FC<EdgeProps<CustomEdgeData>> = ({
   id,
   sourceX,
   sourceY,
@@ -120,9 +121,9 @@ const CustomEdge: React.FC<EdgeProps> = ({
       {/* 标签或编辑框 */}
       {(isEditing || (data?.label && data.label.trim() !== '')) && (
         <foreignObject
-          width={isEditing ? 120 : Math.max(data?.label?.length * 8 || 0, 30)}
+          width={isEditing ? 120 : Math.max((data?.label?.length || 0) * 8, 30)}
           height={isEditing ? 40 : 30}
-          x={labelX - (isEditing ? 60 : Math.max(data?.label?.length * 4 || 0, 15))}
+          x={labelX - (isEditing ? 60 : Math.max((data?.label?.length || 0) * 4, 15))}
           y={labelY - (isEditing ? 20 : 15)}
           requiredExtensions="http://www.w3.org/1999/xhtml"
           className="edge-label-container"

@@ -268,7 +268,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [], onUp
                 display="flex"
                 alignItems="center"
                 justifyContent="center"
-                onClick={(e: React.MouseEvent) => {
+                onClick={(e: React.MouseEvent) => { // FIX: 需要保留参数e因为它被使用了
                     e.stopPropagation();
                     // 更新React状态
                     setIsProcessed(!isProcessed);
@@ -394,7 +394,7 @@ const CustomNode: React.FC<CustomNodeProps> = ({ data, selected, tags = [], onUp
                 onLoad={() => {
                   console.log('图片加载成功:', data.image)
                 }}
-                onClick={(e: React.MouseEvent) => {
+                onClick={() => { // FIX: 删除未使用的参数e
                   // 不阻止事件冒泡，让节点选择正常工作
                   // 触发图片展开事件
                   const event = new CustomEvent('openImageModal', { detail: { image: data.image } })

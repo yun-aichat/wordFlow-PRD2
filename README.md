@@ -63,6 +63,29 @@ npm run build
 npm run preview
 ```
 
+### 部署到GitHub Pages
+
+项目已配置为可直接部署到GitHub Pages：
+
+1. 确保你的仓库名为 `wordFlow-PRD2`
+2. 构建项目：`npm run build`
+3. 执行 `npm run deploy` 即可部署
+
+详细的部署指南请参考 [GitHub Pages 部署指南](./docs/github-pages-deployment.md)，其中包含：
+
+- 完整的部署步骤
+- 常见问题解决方案
+- 自动化部署配置
+
+如需配置自定义域名，请参考 [自定义域名设置指南](./docs/custom-domain-setup.md)
+
+### 部署辅助工具
+
+项目提供了以下辅助脚本，帮助解决部署过程中的常见问题：
+
+- `scripts/fix-git-connection.ps1`：修复 Git 连接问题
+- `scripts/verify-deployment.ps1`：验证 GitHub Pages 部署状态
+
 ## 使用指南
 
 ### 1. 添加节点

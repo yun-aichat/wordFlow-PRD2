@@ -1,88 +1,15 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
 const fs = require('fs-extra');
 
 // 保持对窗口对象的全局引用，避免JavaScript对象被垃圾回收时窗口关闭
 let mainWindow;
 
-// 创建Express应用
-function createExpressApp() {
-  const expressApp = express();
-  const port = 3001;
-
-  // 启用 CORS
-  expressApp.use(cors());
-
-  // 确保上传目录存在
+// 确保应用数据目录存在
+function ensureAppDirectories() {
   const fileUploadDir = path.join(app.getPath('userData'), 'files');
   fs.ensureDirSync(fileUploadDir);
-
-  // 配置 Multer 用于文档文件上传
-  const fileStorage = multer.diskStorage({
-    destination: (_req, _file, cb) => {
-      cb(null, fileUploadDir);
-    },
-    filename: (_req, file, cb) => {
-      // 保留原始文件名，但添加时间戳避免冲突
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-      cb(null, uniqueSuffix + '-' + safeFilename);
-    }
-  });
-
-  const uploadFile = multer({ storage: fileStorage });
-
-  // 设置静态文件目录
-  expressApp.use('/files', express.static(fileUploadDir));
-
-  // 文件上传接口
-  expressApp.post('/upload-file', uploadFile.single('file'), async (req, res) => {
-    console.log('收到文件上传请求');
-    
-    if (!req.file) {
-      console.log('没有文件被上传');
-      return res.status(400).send('No file uploaded.');
-    }
-    
-    try {
-      // 返回文件的访问路径和原始文件名
-      const fileUrl = `/files/${req.file.filename}`;
-      const originalName = req.body.originalName || req.file.originalname;
-      
-      console.log('文件URL:', fileUrl);
-      res.json({ 
-        fileUrl,
-        fileName: originalName,
-        fileSize: req.file.size,
-        fileType: req.file.mimetype
-      });
-    } catch (error) {
-      console.error('处理文件时出错:', error);
-      res.status(500).json({ error: '文件处理失败' });
-    }
-  });
-
-  // 文件下载接口
-  expressApp.get('/download/:filename', (req, res) => {
-    const filename = req.params.filename;
-    const filePath = path.join(fileUploadDir, filename);
-    
-    if (fs.existsSync(filePath)) {
-      res.download(filePath);
-    } else {
-      res.status(404).send('File not found');
-    }
-  });
-
-  // 启动Express服务器
-  expressApp.listen(port, () => {
-    console.log(`Backend server is running at http://localhost:${port}`);
-  });
-
-  return expressApp;
+  return fileUploadDir;
 }
 
 // 创建主窗口
@@ -119,7 +46,7 @@ function createWindow() {
 
 // 当Electron完成初始化并准备创建浏览器窗口时调用此方法
 app.whenReady().then(() => {
-  createExpressApp();
+  ensureAppDirectories();
   createWindow();
 
   app.on('activate', () => {

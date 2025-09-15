@@ -22,10 +22,7 @@ import {
   useToast,
   Image,
   AspectRatio,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalBody,
+  // FIX: 删除未使用的导入
   Menu,
   MenuButton,
   MenuList,
@@ -76,8 +73,8 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
   const [files, setFiles] = useState<{ name: string; url: string; size?: number; type?: string }[]>([])
   const [mdFileContent, setMdFileContent] = useState<string | null>(null)
   const [activeTabIndex, setActiveTabIndex] = useState(0)
-  const attachmentInputRef = useRef<HTMLInputElement>(null) // FIX: 恢复attachmentInputRef，因为代码中有使用
-  const autoSaveTimeoutRef = useRef<number | null>(null)
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const mdContentBoxRef = useRef<HTMLDivElement>(null)
   const reactFlowInstance = useReactFlow()
   const toast = useToast()
@@ -186,7 +183,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
     
     if (match) {
       // 找到匹配的标题，滚动到对应位置
-      const lines = mdFileContent.split('\\n')
+      const lines = mdFileContent.split('\n')
       const lineIndex = lines.findIndex(line => headingRegex.test(line))
       
       if (lineIndex !== -1) {
@@ -216,7 +213,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
         
         toast({
           title: '定位成功',
-          description: `已找到标题"${match[0].replace(/^#+\\s*/, '')}"`,
+          description: `已找到标题"${match[0].replace(/^#+\s*/, '')}"`,
           status: 'success',
           duration: 3000,
           isClosable: true,
@@ -259,7 +256,7 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
     }
 
     // 设置新的定时器，1秒后自动保存
-    autoSaveTimeoutRef.current = window.setTimeout(() => { // FIX: 修复setTimeout类型错误
+    autoSaveTimeoutRef.current = setTimeout(() => { // FIX: 使用setTimeout而不是window.setTimeout
       const updatedNode: CustomNode = {
         ...selectedNode,
         data: {
@@ -342,58 +339,70 @@ const NodeSettingsPanel: React.FC<NodeSettingsPanelProps> = ({
     const file = event.target.files?.[0]
     if (file) {
       try {
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('originalName', file.name)
-        
         toast({
-          title: '正在上传文件',
+          title: '正在处理文件',
           description: `${file.name}`,
           status: 'loading',
           duration: 2000,
           isClosable: true,
         })
         
-        const response = await fetch('/upload-file', {
-          method: 'POST',
-          body: formData,
-        })
+        // 使用FileReader在前端处理文件
+        const reader = new FileReader()
+        reader.onload = () => { // FIX: 删除未使用的参数e
+          // 创建本地URL
+          const fileUrl = URL.createObjectURL(file)
+          
+          // 保存文件信息到状态
+          setFiles(prev => [...prev, { 
+            name: file.name, 
+            url: fileUrl,
+            size: file.size,
+            type: file.type
+          }])
+          
+          // 可选：将文件内容保存到localStorage
+          const fileKey = `file_${Date.now()}_${file.name}`
+          try {
+            localStorage.setItem(fileKey, JSON.stringify({
+              name: file.name,
+              url: fileUrl,
+              size: file.size,
+              type: file.type,
+              lastModified: Date.now()
+            }))
+          } catch (err) {
+            console.warn('文件太大，无法保存到localStorage', err)
+          }
         
-        if (!response.ok) {
-          throw new Error('文件上传失败')
+        toast({
+            title: '文件处理成功',
+            description: `${file.name}`,
+            status: 'success',
+            duration: 2000,
+            isClosable: true,
+          })
         }
         
-        const data = await response.json()
-        setFiles(prev => [...prev, { 
-          name: data.fileName, 
-          url: data.fileUrl,
-          size: data.fileSize,
-          type: data.fileType
-        }])
+        // 开始读取文件
+        reader.readAsArrayBuffer(file)
         
-        toast({
-          title: '文件上传成功',
-          description: `${file.name}`,
-          status: 'success',
-          duration: 2000,
-          isClosable: true,
-        })
-      } catch (error) {
-        console.error('Error uploading file:', error)
-        toast({
-          title: '文件上传失败',
-          description: '请检查后端服务是否正常运行',
-          status: 'error',
-          duration: 3000,
-          isClosable: true,
-        })
-      }
+        } catch (error) {
+          console.error('Error processing file:', error)
+          toast({
+            title: '文件处理失败',
+            description: '无法处理该文件',
+            status: 'error',
+            duration: 3000,
+            isClosable: true,
+          })
+        }
     }
   }
 
   const handleFileDownload = (file: { name: string; url: string }) => {
-    // 如果是服务器上的文件，使用完整URL
-    const fileUrl = file.url.startsWith('http') ? file.url : `http://localhost:3001${file.url}`
+    // 使用文件的URL（可能是Blob URL或数据URL）
+    const fileUrl = file.url
     
     // 创建下载链接
     const link = document.createElement('a')
