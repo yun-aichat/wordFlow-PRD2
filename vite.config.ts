@@ -5,9 +5,9 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // 为GitHub Pages添加base配置，使用仓库名作为基础路径
-  // 如果仓库名为username.github.io，则base可以设为'/'，否则应该设为'/仓库名/'
-  base: process.env.NODE_ENV === 'production' ? '/wordFlow-PRD2/' : '/',
+  // 为GitHub Pages添加base配置，使用相对路径而非绝对路径
+  // 这样可以避免资源路径问题
+  base: './',
   server: {
     port: 3000,
     open: true,
